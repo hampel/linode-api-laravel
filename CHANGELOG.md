@@ -4,21 +4,21 @@
 
 Initial release.
 
-* `LinodeServiceProvider` binds `LinodeManager`, merges `config/linode.php` and publishes it
+- `LinodeServiceProvider` binds `LinodeManager`, merges `config/linode.php` and publishes it
   under the `linode-config` tag
-* `LinodeManager` builds one `Hampel\Linode\Api\Client` per configured account, memoised by
+- `LinodeManager` builds one `Hampel\Linode\Api\Client` per configured account, memoised by
   name; a call naming no account is forwarded to the default
-* `Linode` facade, with a `@method` annotation for each accessor on `Client`
-* `Http::fake()`, `Http::assertSent()` and `Http::preventStrayRequests()` apply to requests the
+- `Linode` facade, with a `@method` annotation for each accessor on `Client`
+- `Http::fake()`, `Http::assertSent()` and `Http::preventStrayRequests()` apply to requests the
   API client makes. Request building, filtering, status mapping and the exception hierarchy are
   the core package's throughout, and its exceptions reach the caller unchanged
-* `Illuminate\Http\Client\Factory` is bound as a singleton when the application has not bound
+- `Illuminate\Http\Client\Factory` is bound as a singleton when the application has not bound
   one, as a Laravel Zero application does not
-* `Psr\Http\Client\ClientInterface` is bound separately: rebind it to route the package's
+- `Psr\Http\Client\ClientInterface` is bound separately: rebind it to route the package's
   requests through an application's own HTTP client
-* `version`, `page_size` and `base_uri` are top-level settings, shared by every account's
+- `version`, `page_size` and `base_uri` are top-level settings, shared by every account's
   client; the core package validates all three when the client is built
-* `UnknownAccount` and `InvalidConfiguration` extend the core package's `LinodeException`. An
+- `UnknownAccount` and `InvalidConfiguration` extend the core package's `LinodeException`. An
   account with no token, and a version or page size the API would refuse, are reported when the
   client is built
-* Requires `hampel/linode-api` `^0.2`, PHP 8.3, and Laravel 12 or 13
+- Requires `hampel/linode-api` `^0.2`, PHP 8.3, and Laravel 12 or 13
