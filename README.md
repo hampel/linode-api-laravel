@@ -257,11 +257,11 @@ The package's real code path runs; only the socket is replaced. So a faked 404 s
 
 Four things worth knowing:
 
-- **`Http::fake()` with no arguments answers every request with an empty 200, and that reads as
-  an empty result rather than an error.** The core package has to treat an empty body as an
-  empty response, because a 204 is how Linode answers an unrestricted user's grants — so a fake
-  with a forgotten body reads as *this account has no zones*, which is a sentence that gets
-  acted on. Always give a body.
+- **Give every fake a body.** `Http::fake()` with no arguments answers every request with an
+  empty 200, and the client raises `MalformedResponseException` on one — only a 204 is a
+  success with no body on this API. That is worth knowing rather than discovering: before
+  `hampel/linode-api` 0.2.0 an empty 200 resolved to an empty response, so a forgotten fixture
+  reported *this account has no zones* instead of failing.
 - **`X-Filter` is where the evidence is.** Filtering on this API is a request header, not a
   query string, so an assertion that you looked a zone up by name has nothing in the URL to
   match on: `$request->hasHeader('X-Filter', '{"domain":"example.com"}')`.
@@ -294,7 +294,7 @@ requests are safe to retry is the application's knowledge, not this package's.
 ## Versioning
 
 `hampel/linode-api` is 0.x, so its public API can change in a minor release and this package
-constrains it at `^0.1` and expects to bump. One open question there could still move a
+constrains it at `^0.2` and expects to bump again. One open question there could still move a
 signature — what a record's `ttl_sec` of 0 inherits — which is why nothing here proxies
 `DomainRecord::effectiveTtl()`.
 

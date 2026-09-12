@@ -157,18 +157,44 @@ final class ExceptionPassthroughTest extends TestCase
     }
 
     #[Test]
-    public function faking_with_no_arguments_reads_as_an_account_with_no_zones(): void
+    public function faking_with_no_arguments_fails_loudly_rather_than_reporting_an_empty_account(): void
     {
-        // NOT an error, and that is the point of pinning it. Http::fake() with no arguments
-        // answers every request with an empty 200, and the core package treats an empty body
-        // as an empty response rather than a malformed one - it has to, because a 204 is how
-        // Linode answers an unrestricted user's grants.
+        // Http::fake() with no arguments answers every request with an empty 200, which is the
+        // easiest mistake to make in a consumer's suite. Until hampel/linode-api 0.2.0 it was
+        // also the one failure this package could not make loud: an empty body resolved to an
+        // empty response, so a forgotten fixture reported "this account has no zones" - a
+        // sentence that gets acted on.
         //
-        // So a fake with a forgotten body is the one failure this package cannot make loud:
-        // it reads as "this account has no zones", which is a sentence that gets acted on.
-        // Always give a body. The README says so for the same reason.
+        // Only a 204 is a success with no body on this API. A successful DELETE is `{}` with a
+        // 200, measured against the live API rather than read off the specification, and that
+        // decodes like any other response.
         Http::fake();
 
-        $this->assertSame([], Linode::domains()->all());
+        $this->expectException(MalformedResponseException::class);
+
+        Linode::domains()->all();
+    }
+
+    #[Test]
+    public function a_genuine_204_is_still_an_empty_response_rather_than_a_failure(): void
+    {
+        // The other arm of the same branch, and the reason it is not simply "an empty body is
+        // malformed". GET profile/grants answers 204 for an UNRESTRICTED user - the trap in
+        // this API most likely to be read backwards, because an empty grants object would say
+        // the user may do nothing, which is the opposite of the truth.
+        //
+        // Pinned here rather than left to the core package's suite because the arms are a
+        // raise and a success, which is the shape where a single-arm test reads as coverage
+        // and is not: the core's suite was green on the defect this package reported, and
+        // would have stayed green if the branch had been narrowed the wrong way.
+        Http::fake(['api.linode.com/*' => Http::response('', 204)]);
+
+        $this->assertNull(Linode::profile()->grants());
+
+        // And at the transport level, where the distinction actually lives.
+        $response = Linode::connection()->get('profile/grants');
+
+        $this->assertSame(204, $response->status);
+        $this->assertTrue($response->isEmpty());
     }
 }

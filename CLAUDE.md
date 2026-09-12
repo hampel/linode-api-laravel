@@ -93,13 +93,21 @@ The core package's `Config` validates all three, and the manager re-raises its
 
 ## Facts worth not rediscovering
 
-- **An empty 200 is an empty result here, not a malformed response.** `Http::fake()` with no
-  arguments answers every request with one, so a fake with a forgotten body reads as *this
-  account has no zones* rather than failing. The core package cannot be stricter: a 204 is how
-  Linode answers an unrestricted user's grants, and `Connection::send()` treats an empty body
-  the same way. This is the one failure this package cannot make loud, so
-  `ExceptionPassthroughTest::faking_with_no_arguments_reads_as_an_account_with_no_zones` pins
-  it and the README warns about it.
+- **Only a 204 is a success with no body, so an empty 200 raises.** `Http::fake()` with no
+  arguments answers every request with an empty 200, so a forgotten fixture fails loudly
+  instead of reporting an empty account. It was the other way round until `hampel/linode-api`
+  0.2.0, and this package is why it changed: the wrapper reported that the wider check made
+  the one failure it could not make loud, and the core settled it by measuring a real
+  successful DELETE — `Content-Type: application/json`, `Content-Length: 2`, body `{}`, which
+  decodes like anything else.
+
+  **Both arms are pinned, deliberately.**
+  `ExceptionPassthroughTest::faking_with_no_arguments_fails_loudly_rather_than_reporting_an_empty_account`
+  covers the raise; `a_genuine_204_is_still_an_empty_response_rather_than_a_failure` covers
+  the success, through `GET profile/grants` on an unrestricted user. A branch whose arms are a
+  raise and a success is the shape where a single-arm test reads as coverage and is not — the
+  core's suite was green on the original defect and would have stayed green if the branch had
+  been narrowed the wrong way.
 - **The 401-versus-401 discrimination rides entirely on response headers.** An insufficient
   scope answers 401, not 403, and `X-OAuth-Scopes` is the only thing separating it from a bad
   credential. A transport that dropped or rewrote headers would turn *widen the token's scopes*
