@@ -15,6 +15,7 @@ use PHPUnit\Framework\Attributes\Test;
 use Psr\Http\Client\ClientInterface;
 use Psr\Http\Message\RequestFactoryInterface;
 use Psr\Http\Message\StreamFactoryInterface;
+use ReflectionProperty;
 
 final class ConfigurationTest extends TestCase
 {
@@ -101,5 +102,47 @@ final class ConfigurationTest extends TestCase
         $this->assertTrue($app->bound(RequestFactoryInterface::class));
         $this->assertTrue($app->bound(StreamFactoryInterface::class));
         $this->assertSame('main', $app->make(Config::class)->get('linode.default'));
+    }
+
+    #[Test]
+    public function booting_the_provider_registers_the_config_to_publish(): void
+    {
+        // The other half of the test above, and not reached by it. Testbench boots the
+        // application inside parent::setUp(), which is before withoutDeprecationHandling()
+        // puts PHPUnit's error handler back - so boot() has always already run under
+        // Laravel's swallowing handler, and a deprecation raised by configPath() or
+        // publishes() on some future framework version would ship in silence. Probed: with
+        // this test absent, a deprecation in boot() exits 0 and prints OK.
+        //
+        // ServiceProvider::$publishes is static and Testbench has already filled it, so
+        // booting a second application overwrites the destination path that
+        // the_config_file_is_publishable_under_its_own_tag asserts on - and which of the two
+        // fails would depend on execution order. Hence the snapshot and the finally.
+        $publishes = new ReflectionProperty(ServiceProvider::class, 'publishes');
+        $groups = new ReflectionProperty(ServiceProvider::class, 'publishGroups');
+        $savedPublishes = $publishes->getValue();
+        $savedGroups = $groups->getValue();
+
+        try {
+            $app = new Application(__DIR__ . '/..');
+            $app->instance('config', new ConfigRepository());
+
+            $provider = new LinodeServiceProvider($app);
+            $provider->register();
+            $provider->boot();
+
+            // By source path rather than destination: the destination is the throwaway
+            // application's config directory, which says nothing about the package.
+            $this->assertSame(
+                [realpath(__DIR__ . '/../config/linode.php')],
+                array_map(
+                    'realpath',
+                    array_keys(ServiceProvider::pathsToPublish(LinodeServiceProvider::class, 'linode-config'))
+                ),
+            );
+        } finally {
+            $publishes->setValue(null, $savedPublishes);
+            $groups->setValue(null, $savedGroups);
+        }
     }
 }
