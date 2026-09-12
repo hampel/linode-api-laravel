@@ -1,0 +1,30 @@
+vendor/
+composer.lock
+composer.phar
+.idea/
+.DS_Store
+.php-cs-fixer.cache
+
+# Both PHPUnit spellings. The directory is what PHPUnit 10 and later write and is the
+# only one this package's constraint can produce; the file is PHPUnit 9's, kept so a
+# checkout that ever runs an older PHPUnit does not leave it tracked.
+.phpunit.cache/
+.phpunit.result.cache
+
+# session notes and audit state - local to this clone, never published
+CLAUDE.local.md
+
+# Secrets. There is no harness here, so no environment file is loaded by anything -
+# these are present because the leak happens at the commit that adds a value, and
+# whoever adds the first one should not also have to remember the rule. Deliberately
+# not anchored with a leading slash, so they match at any depth; a committed
+# .env.example stays tracked.
+.env
+.env.*
+!.env.example
+
+# NTFS alternate data stream left behind when a file is copied from Windows into
+# WSL - it records the zone the download came from and is of no use here. Also
+# covered by ~/.config/git/ignore on this machine, which a clone elsewhere would
+# not have.
+*:Zone.Identifier

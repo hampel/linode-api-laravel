@@ -1,0 +1,24 @@
+includes:
+    - vendor/larastan/larastan/extension.neon
+
+parameters:
+    level: 10
+
+    paths:
+        - src
+        - tests
+
+    # Analyse against every PHP version the package claims to support, in one run. This
+    # covers the PHP axis of the support matrix without running it: PHPStan knows which
+    # functions exist in which version and what changed when. Keep in step with the
+    # "php" constraint in composer.json.
+    phpVersion:
+        min: 80300
+        max: 80500
+
+    # A guard whose docblock says it cannot fail is still worth having, because a
+    # consumer without static analysis can still write the call that trips it. Without
+    # this, PHPStan's floor - the version the --prefer-lowest CI corner resolves - reports
+    # those guards as dead code while the current release does not, so the job fails on
+    # nothing the package did.
+    treatPhpDocTypesAsCertain: false

@@ -1,0 +1,9 @@
+{
+    "symbol-whitelist": [
+        "Illuminate\\Contracts\\Config\\Repository",
+        "Illuminate\\Contracts\\Events\\Dispatcher",
+        "Illuminate\\Http\\Client\\Factory",
+        "Illuminate\\Support\\Facades\\Facade",
+        "Illuminate\\Support\\ServiceProvider"
+    ]
+}
