@@ -176,4 +176,75 @@ final class TransportTest extends TestCase
 
         $this->assertSame(1, $failed);
     }
+
+    #[Test]
+    public function the_configured_timeouts_reach_the_transport(): void
+    {
+        // A fake callback receives the options Guzzle is about to use, so what is asserted here
+        // is what a real connection would get. PendingRequest merges its options only inside its
+        // own sendRequest(), which the adapter does not call - so setting them on the pending
+        // request is not the same as sending with them.
+        $config = $this->container()->make(Config::class);
+        $config->set('linode.timeout', 7);
+        $config->set('linode.connect_timeout', 3);
+
+        $options = [];
+        Http::fake(function (Request $request, array $sent) use (&$options) {
+            $options = $sent;
+
+            return Http::response(self::zone());
+        });
+
+        Linode::domains()->get(1234);
+
+        $this->assertEquals(7, $options['timeout'] ?? null);
+        $this->assertEquals(3, $options['connect_timeout'] ?? null);
+    }
+
+    #[Test]
+    public function global_transport_options_reach_the_transport(): void
+    {
+        // An application behind a proxy, or trusting its own CA bundle, sets that once with
+        // Http::globalOptions() and expects every outbound request to honour it.
+        Http::globalOptions([
+            'proxy' => 'http://proxy.invalid:3128',
+            'verify' => '/etc/ssl/certs/under-test.pem',
+        ]);
+
+        $options = [];
+        Http::fake(function (Request $request, array $sent) use (&$options) {
+            $options = $sent;
+
+            return Http::response(self::zone());
+        });
+
+        Linode::domains()->get(1234);
+
+        $this->assertSame('http://proxy.invalid:3128', $options['proxy'] ?? null);
+        $this->assertSame('/etc/ssl/certs/under-test.pem', $options['verify'] ?? null);
+    }
+
+    #[Test]
+    public function global_options_that_would_rewrite_the_request_do_not_reach_it(): void
+    {
+        // The reason the options are an allowlist rather than passed wholesale. Guzzle applies a
+        // headers, query or json option ON TOP of the request it is handed, so a global one would
+        // replace the core package's Authorization and Accept headers, its query string, or its
+        // body - and the request would go out as something the core package did not build.
+        Http::globalOptions([
+            'headers' => ['Authorization' => 'Bearer hijacked', 'X-Global' => 'yes'],
+            'query' => ['hijacked' => '1'],
+            'json' => ['hijacked' => true],
+        ]);
+
+        Http::fake(['api.linode.com/*' => Http::response(self::record())]);
+
+        Linode::records()->update(1234, 55, ['ttl_sec' => 300]);
+
+        Http::assertSent(fn (Request $request): bool => $request->hasHeader('Authorization', 'Bearer token-under-test')
+            && ! $request->hasHeader('X-Global')
+            && $request->url() === 'https://api.linode.com/v4/domains/1234/records/55'
+            && $request['ttl_sec'] === 300
+            && ! isset($request['hijacked']));
+    }
 }

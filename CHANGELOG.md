@@ -1,5 +1,14 @@
 # CHANGELOG
 
+## Unreleased
+
+- A client resolved before `Http::swap()` now sends through the swapped-in factory, so its fakes
+  and `preventStrayRequests()` apply
+- The configured `timeout` and `connect_timeout`, and transport options from
+  `Http::globalOptions()` such as `proxy` and `verify`, now reach each request. Global `headers`,
+  `query` and body options are not applied
+- `PendingRequestClient` accepts a closure resolving the HTTP factory, as well as a `Factory`
+
 ## 1.1.0 (2026-09-13)
 
 - `LINODE_API_TOKEN` is the documented token variable. `LINODE_TOKEN` is still read when

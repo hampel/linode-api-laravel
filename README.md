@@ -158,8 +158,13 @@ terminates the connection.
 'connect_timeout' => 5,
 ```
 
-Applied to every request, alongside any `Http::globalOptions()` and
-`Http::globalRequestMiddleware()` the application has configured.
+Applied to every request. `Http::globalRequestMiddleware()` applies too.
+
+**Of `Http::globalOptions()`, only transport options apply** — timeouts, TLS (`verify`, `cert`,
+`ssl_key` and their types, `crypto_method`), `proxy`, `version`, `force_ip_resolve`,
+`decode_content` and `curl`. Options that would change the request itself — `headers`, `query`,
+`json`, `form_params`, `body` and the like — are deliberately not passed on, because they would
+replace the `Authorization` header, query string or body the core package built.
 
 There is no redirect setting. Guzzle's PSR-18 entry point does not follow redirects, and no
 Linode endpoint answers one.
@@ -301,9 +306,9 @@ Four things worth knowing:
 - **Request bodies are assertable** — `$request['ttl_sec']` works, because the core package
   writes `application/json` and `Illuminate\Http\Client\Request::isJson()` is what gates the
   parsing.
-- **Order does not matter.** Faking after the client has been resolved works, because the
-  transport resolves Laravel's HTTP factory at the moment of sending rather than when it was
-  built.
+- **Order does not matter.** Faking after the client has been resolved works, and so does
+  `Http::swap()`, because the transport resolves Laravel's HTTP factory at the moment of sending
+  rather than when it was built.
 
 Replace the transport entirely by binding `Psr\Http\Client\ClientInterface`, which is how an
 application with its own outbound HTTP policy — a proxy-aware or SSRF-guarded client that

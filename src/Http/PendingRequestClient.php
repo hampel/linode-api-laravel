@@ -38,8 +38,8 @@ use Psr\Http\Message\ResponseInterface;
  * moment it is called. A pending request built once and kept therefore holds a snapshot: a
  * fake registered after the client was first resolved would never be consulted, and the
  * request would go to the real API. Rebuilding here means the stubs, the stray-request
- * setting, `Http::globalOptions()` and `Http::globalRequestMiddleware()` are all read at the
- * moment of sending, so ordering stops mattering.
+ * setting, `Http::globalRequestMiddleware()` and the transport half of `Http::globalOptions()`
+ * are all read at the moment of sending, so ordering stops mattering.
  *
  * THE FACTORY IS RESOLVED PER REQUEST TOO, for the same reason one level up. Http::swap(new
  * Factory) - the usual way for a test to start from a clean set of fakes, since fake() merges -
@@ -74,6 +74,18 @@ use Psr\Http\Message\ResponseInterface;
  * developed against. http_errors in particular must stay off: with it on a 404 would arrive
  * as a Guzzle exception, and the core package would report it as a transport failure instead
  * of mapping it to NotFoundException.
+ *
+ * THE PENDING REQUEST'S OPTIONS ARE COPIED ACROSS BY HAND, AND ONLY SOME OF THEM. PendingRequest
+ * merges its options - the timeouts set here, and everything from Http::globalOptions() - only
+ * inside its own sendRequest(), and buildClient() returns a Guzzle client made from the handler
+ * stack alone. Sending on that client directly, as this class must, drops every one of them
+ * unless they are passed to send(): measured, a configured timeout and connect_timeout arrived as
+ * null, and a global proxy and CA bundle likewise.
+ *
+ * They are passed as an allowlist of TRANSPORT options - how a request is sent, never what is
+ * sent. Guzzle applies a headers, query or json option on top of the request it is handed, so
+ * passing the options wholesale would let a global Authorization header, query string or body
+ * replace what the core package built. See transportOptions().
  *
  * WHAT IT DOES NOT DO: raise ResponseReceived or ConnectionFailed. Laravel dispatches those
  * from PendingRequest::send(), a layer above the handler stack, so anything listening for them
@@ -116,12 +128,18 @@ final class PendingRequestClient implements ClientInterface
 
         $factory = $this->factory instanceof Closure ? ($this->factory)() : $this->factory;
 
-        return $factory->createPendingRequest()
+        $pending = $factory->createPendingRequest()
             ->timeout($this->timeout)
             ->connectTimeout($this->connectTimeout)
-            ->setHandler($handler)
-            ->buildClient()
+            ->setHandler($handler);
+
+        return $pending->buildClient()
             ->send($request, [
+                // First, so that nothing below can be overridden by a global option - none of
+                // those keys is on the allowlist, but the order makes it a property rather than
+                // a coincidence.
+                ...self::transportOptions($pending->getOptions()),
+
                 RequestOptions::SYNCHRONOUS => true,
 
                 // No Linode endpoint answers a redirect, so this settles nothing about this
@@ -145,5 +163,171 @@ final class PendingRequestClient implements ClientInterface
                 'on_stats' => static function (TransferStats $stats): void {
                 },
             ]);
+    }
+
+    /**
+     * The options from a pending request that govern how a request is sent, never what is sent.
+     *
+     * Each is taken only when its value has the type Guzzle declares for it; an option that does
+     * not is dropped rather than passed on to fail somewhere less obvious. Array forms are rebuilt
+     * element by element for the same reason, and because Guzzle 8 declares send()'s options as an
+     * array shape that an unchecked array cannot satisfy.
+     *
+     * @param  array<mixed>  $options
+     * @return array{
+     *     timeout?: int|float,
+     *     connect_timeout?: int|float,
+     *     read_timeout?: int|float,
+     *     verify?: bool|string,
+     *     version?: string|int|float,
+     *     force_ip_resolve?: string,
+     *     crypto_method?: int,
+     *     crypto_method_max?: int,
+     *     decode_content?: bool|string,
+     *     cert?: string|array{0: string, 1?: string|null},
+     *     cert_type?: string,
+     *     ssl_key?: string|array{0: string, 1?: string|null},
+     *     ssl_key_type?: string,
+     *     proxy?: string|array{http?: string|null, https?: string|null, no?: string|array<array-key, string>|null},
+     *     curl?: array<int|string, mixed>
+     * }
+     */
+    private static function transportOptions(array $options): array
+    {
+        $transport = [];
+
+        // One key at a time rather than a loop over names: an array built with a variable key
+        // loses its shape to static analysis on the oldest PHPStan this package supports.
+        if (self::isNumber($options['timeout'] ?? null)) {
+            $transport['timeout'] = $options['timeout'];
+        }
+
+        if (self::isNumber($options['connect_timeout'] ?? null)) {
+            $transport['connect_timeout'] = $options['connect_timeout'];
+        }
+
+        if (self::isNumber($options['read_timeout'] ?? null)) {
+            $transport['read_timeout'] = $options['read_timeout'];
+        }
+
+        if (isset($options['verify']) && (is_bool($options['verify']) || is_string($options['verify']))) {
+            $transport['verify'] = $options['verify'];
+        }
+
+        if (isset($options['version']) && (is_string($options['version']) || self::isNumber($options['version']))) {
+            $transport['version'] = $options['version'];
+        }
+
+        if (isset($options['force_ip_resolve']) && is_string($options['force_ip_resolve'])) {
+            $transport['force_ip_resolve'] = $options['force_ip_resolve'];
+        }
+
+        if (isset($options['crypto_method']) && is_int($options['crypto_method'])) {
+            $transport['crypto_method'] = $options['crypto_method'];
+        }
+
+        if (isset($options['crypto_method_max']) && is_int($options['crypto_method_max'])) {
+            $transport['crypto_method_max'] = $options['crypto_method_max'];
+        }
+
+        if (isset($options['decode_content']) && (is_bool($options['decode_content']) || is_string($options['decode_content']))) {
+            $transport['decode_content'] = $options['decode_content'];
+        }
+
+        $cert = self::pathWithPassword($options['cert'] ?? null);
+
+        if ($cert !== null) {
+            $transport['cert'] = $cert;
+        }
+
+        if (isset($options['cert_type']) && is_string($options['cert_type'])) {
+            $transport['cert_type'] = $options['cert_type'];
+        }
+
+        $sslKey = self::pathWithPassword($options['ssl_key'] ?? null);
+
+        if ($sslKey !== null) {
+            $transport['ssl_key'] = $sslKey;
+        }
+
+        if (isset($options['ssl_key_type']) && is_string($options['ssl_key_type'])) {
+            $transport['ssl_key_type'] = $options['ssl_key_type'];
+        }
+
+        $proxy = self::proxy($options['proxy'] ?? null);
+
+        if ($proxy !== null) {
+            $transport['proxy'] = $proxy;
+        }
+
+        if (isset($options['curl']) && is_array($options['curl'])) {
+            $transport['curl'] = $options['curl'];
+        }
+
+        return $transport;
+    }
+
+    /**
+     * @phpstan-assert-if-true int|float $value
+     */
+    private static function isNumber(mixed $value): bool
+    {
+        return is_int($value) || is_float($value);
+    }
+
+    /**
+     * A certificate or key: a path, or a path and its password.
+     *
+     * @return string|array{0: string, 1?: string|null}|null
+     */
+    private static function pathWithPassword(mixed $value): string|array|null
+    {
+        if (is_string($value)) {
+            return $value;
+        }
+
+        if (! is_array($value) || ! isset($value[0]) || ! is_string($value[0])) {
+            return null;
+        }
+
+        $password = $value[1] ?? null;
+
+        return is_string($password) ? [$value[0], $password] : [$value[0]];
+    }
+
+    /**
+     * A proxy: one URI for every scheme, or one per scheme with an exclusion list.
+     *
+     * @return string|array{http?: string|null, https?: string|null, no?: string|array<array-key, string>|null}|null
+     */
+    private static function proxy(mixed $value): string|array|null
+    {
+        if (is_string($value)) {
+            return $value;
+        }
+
+        if (! is_array($value)) {
+            return null;
+        }
+
+        $proxy = [];
+
+        if (isset($value['http']) && is_string($value['http'])) {
+            $proxy['http'] = $value['http'];
+        }
+
+        if (isset($value['https']) && is_string($value['https'])) {
+            $proxy['https'] = $value['https'];
+        }
+
+        if (isset($value['no'])) {
+            if (is_string($value['no'])) {
+                $proxy['no'] = $value['no'];
+            } elseif (is_array($value['no'])) {
+                $proxy['no'] = array_values(array_filter($value['no'], is_string(...)));
+            }
+        }
+
+        return $proxy === [] ? null : $proxy;
     }
 }

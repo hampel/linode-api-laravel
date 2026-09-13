@@ -36,13 +36,31 @@ to exist.
 
 ## The adapter, and why it looks the way it does
 
-Three decisions in `PendingRequestClient` are load-bearing and each has a way of looking like
+Five decisions in `PendingRequestClient` are load-bearing and each has a way of looking like
 clutter to be tidied away:
 
 - **The pending request is rebuilt on every send.** `Factory::fake()` *replaces* the factory's
   stub collection, and `createPendingRequest()` copies whatever is there when it is called — so
   a client built once and kept holds a snapshot, and a fake registered after it was built never
   applies. `HttpFakeTest::faking_after_the_client_was_resolved_still_intercepts` is the test.
+- **The factory itself is resolved on every send, through a closure the provider passes.**
+  `Http::swap(new Factory)` binds a new factory into the container, and a client holding the one
+  it was built with sent past the new fakes and past its `preventStrayRequests()` — to the real
+  API, with the token. The constructor still accepts a `Factory` instance for hand-built clients;
+  that form does not follow a swap. **The swap tests point `base_uri` at `api.linode.invalid`**,
+  so a regression fails to resolve rather than reaching Linode — measured that way on 2026-09-14
+  before the fix, and a closed local port is no substitute here, since under WSL mirrored
+  networking it times out rather than refusing.
+- **Options are passed to `send()` by hand, as a typed allowlist of transport options.**
+  `PendingRequest` merges its options only inside its own `sendRequest()`, so sending on
+  `buildClient()` directly dropped the configured timeouts and every `Http::globalOptions()`
+  entry — measured as `null` on 2026-09-14. **Never pass them wholesale**: Guzzle applies
+  `headers`, `query` and `json` on top of the request it is handed, so a global one would replace
+  the core package's `Authorization`, query string or body. `TransportTest` pins both directions,
+  and was probed both ways — passing nothing fails the timeout and proxy tests, passing
+  everything fails the header/query/body test. Build the allowlist one key at a time: PHPStan
+  2.1.22, which the `--prefer-lowest` corner resolves, loses the array shape of one built in a
+  loop.
 - **One Guzzle handler is shared across those rebuilds.** The handler owns curl's connection
   pool, so keep-alive survives even though the stack around it is new each time. Linode pages
   at 100, so an account with a few hundred zones — or one zone with a few hundred records —
