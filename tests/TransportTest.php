@@ -150,11 +150,22 @@ final class TransportTest extends TestCase
         Http::fake(['api.linode.com/*' => Http::failedConnection()]);
 
         // The control, as above: Laravel's own send() path does raise it.
+        //
+        // Captured as Throwable and asserted after, rather than caught as ConnectionException.
+        // The call goes through the Http facade, and on the lowest toolchain this package
+        // supports (PHPStan 2.1.22, Larastan 3.4.2, Laravel 12.61.1) the facade does not carry
+        // PendingRequest::get()'s @throws, so a typed catch is reported dead and the assertion
+        // after it unreachable. It is also why fail() is not inside the try: a Throwable catch
+        // would swallow it.
+        $thrown = null;
+
         try {
             Http::get('https://api.linode.com/v4/domains/1234');
-            $this->fail('Expected a ConnectionException.');
-        } catch (ConnectionException) {
+        } catch (\Throwable $e) {
+            $thrown = $e;
         }
+
+        $this->assertInstanceOf(ConnectionException::class, $thrown);
         $this->assertSame(1, $failed);
 
         try {
