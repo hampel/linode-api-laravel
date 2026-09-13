@@ -11,6 +11,7 @@ use Illuminate\Config\Repository as ConfigRepository;
 use Illuminate\Contracts\Config\Repository as Config;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\ServiceProvider;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Test;
 use Psr\Http\Client\ClientInterface;
 use Psr\Http\Message\RequestFactoryInterface;
@@ -153,5 +154,75 @@ final class ConfigurationTest extends TestCase
             $publishes->setValue(null, $savedPublishes);
             $groups->setValue(null, $savedGroups);
         }
+    }
+
+    /**
+     * @return array<string, array{array<string, string>, string|null}>
+     */
+    public static function tokenVariables(): array
+    {
+        return [
+            'neither set' => [[], null],
+            'only the earlier name, as existing .env files have it' => [['LINODE_TOKEN' => 'old-token'], 'old-token'],
+            'only the documented name' => [['LINODE_API_TOKEN' => 'new-token'], 'new-token'],
+            'both set, the documented name wins' => [['LINODE_API_TOKEN' => 'new-token', 'LINODE_TOKEN' => 'old-token'], 'new-token'],
+            'documented name present but blank' => [['LINODE_API_TOKEN' => '', 'LINODE_TOKEN' => 'old-token'], 'old-token'],
+        ];
+    }
+
+    /**
+     * @param  array<string, string>  $environment
+     */
+    #[Test]
+    #[DataProvider('tokenVariables')]
+    public function the_shipped_config_reads_the_documented_token_name_and_falls_back_to_the_earlier_one(
+        array $environment,
+        ?string $expected,
+    ): void {
+        // The last case is the reason the config uses `?:` and not env()'s default argument. A
+        // blank LINODE_API_TOKEN= line - an updated .env.example copied in while the real token
+        // still sits under the old name - is an empty string rather than null, so the default
+        // would never apply and the account would be refused for having no token.
+        $names = ['LINODE_API_TOKEN', 'LINODE_TOKEN'];
+        $saved = [];
+
+        foreach ($names as $name) {
+            $saved[$name] = getenv($name);
+            $this->unsetEnvironment($name);
+        }
+
+        try {
+            foreach ($environment as $name => $value) {
+                putenv($name . '=' . $value);
+                $_ENV[$name] = $value;
+                $_SERVER[$name] = $value;
+            }
+
+            $config = require __DIR__ . '/../config/linode.php';
+            $this->assertIsArray($config);
+
+            $accounts = $config['accounts'] ?? null;
+            $this->assertIsArray($accounts);
+            $main = $accounts['main'] ?? null;
+            $this->assertIsArray($main);
+
+            $this->assertSame($expected, $main['token'] ?? null);
+        } finally {
+            foreach ($names as $name) {
+                $this->unsetEnvironment($name);
+
+                if ($saved[$name] !== false) {
+                    putenv($name . '=' . $saved[$name]);
+                    $_ENV[$name] = $saved[$name];
+                    $_SERVER[$name] = $saved[$name];
+                }
+            }
+        }
+    }
+
+    private function unsetEnvironment(string $name): void
+    {
+        putenv($name);
+        unset($_ENV[$name], $_SERVER[$name]);
     }
 }

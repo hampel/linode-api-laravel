@@ -108,6 +108,14 @@ The core package's `Config` validates all three, and the manager re-raises its
   raise and a success is the shape where a single-arm test reads as coverage and is not — the
   core's suite was green on the original defect and would have stayed green if the branch had
   been narrowed the wrong way.
+- **The token variable is `LINODE_API_TOKEN`, and `LINODE_TOKEN` is read with `?:`, not as
+  `env()`'s default.** The rename brings it in line with the sibling wrappers' `*_API_TOKEN`
+  without breaking an existing `.env`. The obvious form, `env('LINODE_API_TOKEN',
+  env('LINODE_TOKEN'))`, fails in the one situation a rename creates: a blank
+  `LINODE_API_TOKEN=` line copied from an updated example while the real token still sits under
+  the old name is an empty string, not null, so the default never applies and the account is
+  refused for having no token. `ConfigurationTest` pins all five cases, and with the `env()`
+  default form it fails exactly the blank one.
 - **The 401-versus-401 discrimination rides entirely on response headers.** An insufficient
   scope answers 401, not 403, and `X-OAuth-Scopes` is the only thing separating it from a bad
   credential. A transport that dropped or rewrote headers would turn *widen the token's scopes*

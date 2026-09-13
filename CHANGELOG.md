@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- `LINODE_API_TOKEN` is the documented token variable. `LINODE_TOKEN` is still read when
+  `LINODE_API_TOKEN` is unset or empty
 - README: under Laravel Zero, list `LinodeServiceProvider` in `config/app.php` and import the
   facade by class name; Laravel Zero does not discover packages. `vendor:publish` works once the
   provider is listed

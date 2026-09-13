@@ -35,12 +35,17 @@ return [
     | allowed to 401 on first use. Every Linode endpoint needs a credential; there is
     | no anonymous request to fall back to.
     |
+    | LINODE_API_TOKEN is the variable to set. LINODE_TOKEN, the earlier name, is still
+    | read when LINODE_API_TOKEN is unset OR EMPTY -- `?:` rather than env()'s default,
+    | because a blank LINODE_API_TOKEN= line is not null, so the default would never
+    | apply and an account with a working LINODE_TOKEN would be refused.
+    |
     */
 
     'accounts' => [
 
         'main' => [
-            'token' => env('LINODE_TOKEN'),
+            'token' => env('LINODE_API_TOKEN') ?: env('LINODE_TOKEN'),
         ],
 
     ],

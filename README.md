@@ -91,8 +91,11 @@ An account needs a token. Nothing else is required — there is exactly one Lino
 self-hosted API there is no URL to configure.
 
 ```dotenv
-LINODE_TOKEN=your-personal-access-token
+LINODE_API_TOKEN=your-personal-access-token
 ```
+
+`LINODE_TOKEN`, the name earlier releases documented, is still read when `LINODE_API_TOKEN` is unset
+or empty, so an existing `.env` keeps working.
 
 **A personal access token and an OAuth access token are the same thing here.** Linode does not
 distinguish them on the wire: same header, same scopes, same `X-OAuth-Scopes` in the reply. So
@@ -106,11 +109,11 @@ The shipped `config/linode.php` defines one account called `main`. Add more by n
 
 'accounts' => [
     'production' => [
-        'token' => env('LINODE_TOKEN'),
+        'token' => env('LINODE_API_TOKEN'),
     ],
 
     'staging' => [
-        'token' => env('STAGING_LINODE_TOKEN'),
+        'token' => env('STAGING_LINODE_API_TOKEN'),
     ],
 ],
 ```
