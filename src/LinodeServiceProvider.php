@@ -73,7 +73,13 @@ final class LinodeServiceProvider extends ServiceProvider
         $this->app->bindIf(RequestFactoryInterface::class, static fn (): RequestFactoryInterface => new Psr17Factory());
         $this->app->bindIf(StreamFactoryInterface::class, static fn (): StreamFactoryInterface => new Psr17Factory());
 
-        $this->app->singleton(self::HTTP_CLIENT, function (): ClientInterface {
+        // singletonIf, so an application's own binding of the key survives whichever order the
+        // providers register in. A full Laravel application registers discovered packages before
+        // its own providers, but Laravel Zero registers config/app.php in list order, and an
+        // AppServiceProvider listed first would otherwise have its override replaced here,
+        // silently. No sibling package binds this key, so keeping an existing binding cannot
+        // bring back the shared-PSR-18 collision.
+        $this->app->singletonIf(self::HTTP_CLIENT, function (): ClientInterface {
             $config = $this->app->make(Config::class);
 
             // The Factory the Http facade resolves, looked up again on every send, which is

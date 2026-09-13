@@ -318,6 +318,10 @@ to go through — makes this package use it:
 $this->app->singleton('linode.http_client', fn ($app) => $app->make(MyPolicyClient::class));
 ```
 
+The package binds the key only if nothing has already, so the override holds whichever order the
+providers register in — including Laravel Zero, where `config/app.php` lists `AppServiceProvider`
+before this package's provider.
+
 **Binding `Psr\Http\Client\ClientInterface` does not reach this package.** That key is shared by
 everything that speaks PSR-18, and the package deliberately neither binds it nor reads it, so
 installing another API wrapper — or any library that binds it — cannot take over Linode's

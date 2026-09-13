@@ -53,6 +53,14 @@ clutter to be tidied away:
   `<config key>.http_client` shape is shared with the sibling wrappers so an application meets one
   override style. `TransportTest` registers a foreign `ClientInterface` provider both before and
   after this one; both tests failed against the old binding.
+
+  **The key is bound with `singletonIf()`, so an application's own binding survives provider
+  order.** A full Laravel application registers discovered packages before its own providers, so
+  an `AppServiceProvider` override wins either way; Laravel Zero registers `config/app.php` in list
+  order, and the README lists `AppServiceProvider` first, where `singleton()` replaced the
+  override silently. `HttpClientOverrideTest` lists an override provider first; under `singleton()`
+  the package's own adapter sent instead — caught by `preventStrayRequests()` and a `.invalid`
+  host rather than reaching Linode.
 - **The factory itself is resolved on every send, through a closure the provider passes.**
   `Http::swap(new Factory)` binds a new factory into the container, and a client holding the one
   it was built with sent past the new fakes and past its `preventStrayRequests()` — to the real

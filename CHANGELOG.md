@@ -7,6 +7,8 @@
   `ClientInterface` to replace the transport must bind `linode.http_client` instead
 - The transport is no longer replaced by another package that binds `ClientInterface`, so this
   package's own adapter and timeouts apply whatever else is installed
+- An application's own `linode.http_client` binding is kept whichever order the service providers
+  register in
 - `InvalidConfiguration` is raised when `linode.http_client` is bound to something other than a
   PSR-18 client
 
