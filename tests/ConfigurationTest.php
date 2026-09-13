@@ -124,6 +124,15 @@ final class ConfigurationTest extends TestCase
         $savedGroups = $groups->getValue();
 
         try {
+            // Emptied, not just restored afterwards. Testbench's own boot has registered an
+            // entry naming the SAME source path this one would, so against the filled statics
+            // the assertion below cannot tell whose registration it is seeing and passes even
+            // when the provider under test registered nothing. Measured: with the hand-built
+            // application alone reporting runningInConsole() as false, the assertion passed
+            // without this and failed with it.
+            $publishes->setValue(null, []);
+            $groups->setValue(null, []);
+
             $app = new Application(__DIR__ . '/..');
             $app->instance('config', new ConfigRepository());
 
