@@ -149,6 +149,13 @@ The core package's `Config` validates all three, and the manager re-raises its
   is resolved happens to work and faking after does not. `tests/LaravelZeroTest.php` builds the
   container by hand because Testbench always boots a full application and can never reach this.
 
+  **Laravel Zero also ignores package discovery**, which that test cannot see: its `Application`
+  sets the package manifest to `[]`, so a consumer lists the provider in `config/app.php`, the
+  global `Linode` alias never exists, and there is no `vendor:publish`. The facade imported by
+  class name works, and `Http::fake()` intercepts through it. The README said the reverse until
+  2026-09-13, when a consuming Laravel Zero tool met a null `config('linode')` on its first call;
+  every part of the corrected README was then measured in a Laravel Zero 13.0.0 application.
+
 - **`composer-require-checker` carries the undeclared-dependency check here, not the dev-free
   PHPStan job.** `laravel/framework` `replace`s every `illuminate/*` component, so the framework
   supplies every `Illuminate` symbol whether its component was declared or not. The five

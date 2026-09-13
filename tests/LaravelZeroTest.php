@@ -31,6 +31,11 @@ use PHPUnit\Framework\Attributes\Test;
  *
  * Laravel Zero is also the likeliest home for this package. A tool that reconciles DNS from a
  * file, or renews a certificate, is a command rather than a web request.
+ *
+ * WHAT THIS CANNOT TEST: registration. Laravel Zero empties the package manifest, so the provider
+ * is never discovered and a consumer has to list it in config/app.php. These tests register it by
+ * hand, which is the right way to reach the factory binding and makes discovery invisible to them
+ * by construction. The README carries that instruction; nothing in this package can enforce it.
  */
 final class LaravelZeroTest extends \PHPUnit\Framework\TestCase
 {

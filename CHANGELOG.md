@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- README: under Laravel Zero, list `LinodeServiceProvider` in `config/app.php`, import the
+  facade by class name, and copy `config/linode.php` by hand; Laravel Zero does not discover
+  packages
 - Corrected the documentation of Laravel's HTTP client events: `RequestSending` fires for
   requests the API client makes; `ResponseReceived` and `ConnectionFailed` do not
 

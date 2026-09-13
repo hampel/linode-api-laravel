@@ -28,13 +28,15 @@ different exceptions rather than both becoming an unsuccessful response.
 
 PHP 8.3 or later, and Laravel 12 or 13.
 
-Laravel Zero works too — providers, config and facades behave identically — and needs the HTTP
-component, which an application opts into with `php <app> app:install http` (that command runs
-`composer require illuminate/http` and nothing else). It is the likelier home for this package
-in any case: a tool that reconciles DNS from a file, or renews a certificate, is a command
-rather than a web request.
+Laravel Zero works too, and needs the HTTP component, which an application opts into with
+`php <app> app:install http` (that command runs `composer require illuminate/http` and nothing
+else). It is the likelier home for this package in any case: a tool that reconciles DNS from a
+file, or renews a certificate, is a command rather than a web request.
 
-One difference is handled for you and worth knowing about. Laravel binds
+**Laravel Zero ignores package discovery, so the provider has to be listed by hand** — see
+[Laravel Zero](#laravel-zero) under Installation.
+
+One other difference is handled for you and worth knowing about. Laravel binds
 `Illuminate\Http\Client\Factory` as a singleton in `FoundationServiceProvider`, which a Laravel
 Zero application does not register — and the HTTP component installs the classes without
 binding anything. Unbound, the container builds a fresh factory on every resolution, so the one
@@ -48,12 +50,36 @@ has, so the behaviour is the same on both platforms.
 composer require hampel/linode-api-laravel
 ```
 
-The provider and the `Linode` alias are discovered automatically. Publish the config file if
-you want to edit it:
+In a Laravel application the provider and the `Linode` alias are discovered automatically.
+Publish the config file if you want to edit it:
 
 ```bash
 php artisan vendor:publish --tag=linode-config
 ```
+
+### Laravel Zero
+
+**Laravel Zero skips package discovery entirely**, so nothing this package declares for discovery
+reaches it: the provider is not loaded, `config('linode')` is null, and the manager cannot be
+built. List the provider in `config/app.php`:
+
+```php
+'providers' => [
+    App\Providers\AppServiceProvider::class,
+    Hampel\Linode\Api\Laravel\LinodeServiceProvider::class,
+],
+```
+
+**The facade still works; the global `Linode` alias does not.** Import it by class name, which the
+examples below already do:
+
+```php
+use Hampel\Linode\Api\Laravel\Facades\Linode;
+```
+
+Laravel Zero has no `vendor:publish` either. The environment variables below cover the shipped
+configuration; to edit its structure — to add a second account, say — copy
+`vendor/hampel/linode-api-laravel/config/linode.php` to `config/linode.php`.
 
 ## Configuration
 
