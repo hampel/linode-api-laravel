@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Hampel\Linode\Api\Laravel;
 
 use GuzzleHttp\Psr7\HttpFactory as Psr17Factory;
+use Hampel\Linode\Api\Laravel\Exception\InvalidConfiguration;
 use Hampel\Linode\Api\Laravel\Http\PendingRequestClient;
 use Illuminate\Contracts\Config\Repository as Config;
 use Illuminate\Contracts\Container\Container;
@@ -19,13 +20,27 @@ use Psr\Log\LoggerInterface;
 /**
  * Wires the Linode API manager into the container.
  *
- * ClientInterface is bound separately, and by interface, because it is the package's
- * extension point: rebind or decorate it and every account's client picks the replacement up.
- * The default sends through Laravel's HTTP client, which is what makes the package's traffic
- * visible to Http::fake() - see PendingRequestClient.
+ * The transport is bound under linode.http_client - never under Psr\Http\Client\ClientInterface -
+ * and the manager is built only from that key. Rebind or decorate linode.http_client and every
+ * account's client picks the replacement up. The default sends through Laravel's HTTP client,
+ * which is what makes the package's traffic visible to Http::fake() - see PendingRequestClient.
+ *
+ * NOT THE PSR-18 INTERFACE, DELIBERATELY. That is one container key shared by everything that
+ * speaks PSR-18, and the sibling Laravel API wrappers used to claim it too: with two installed,
+ * the provider registered last supplied every package's adapter, with its own timeouts, and a
+ * package's own fixes never ran. A package-specific key cannot collide, and there is no
+ * fallback to a ClientInterface bound elsewhere - an older sibling or an unrelated library could
+ * be the one that bound it, and the manager would silently take it, losing Http::fake().
  */
 final class LinodeServiceProvider extends ServiceProvider
 {
+    /**
+     * The container key the transport is bound under, and the documented override point. The
+     * same `<config key>.http_client` shape as the sibling wrappers, so an application meets one
+     * override style.
+     */
+    public const HTTP_CLIENT = 'linode.http_client';
+
     public function register(): void
     {
         $this->mergeConfigFrom(__DIR__ . '/../config/linode.php', 'linode');
@@ -58,7 +73,7 @@ final class LinodeServiceProvider extends ServiceProvider
         $this->app->bindIf(RequestFactoryInterface::class, static fn (): RequestFactoryInterface => new Psr17Factory());
         $this->app->bindIf(StreamFactoryInterface::class, static fn (): StreamFactoryInterface => new Psr17Factory());
 
-        $this->app->singleton(ClientInterface::class, function (): ClientInterface {
+        $this->app->singleton(self::HTTP_CLIENT, function (): ClientInterface {
             $config = $this->app->make(Config::class);
 
             // The Factory the Http facade resolves, looked up again on every send, which is
@@ -74,9 +89,17 @@ final class LinodeServiceProvider extends ServiceProvider
         });
 
         $this->app->singleton(LinodeManager::class, function (): LinodeManager {
+            $client = $this->app->make(self::HTTP_CLIENT);
+
+            // An application can bind the key to anything, so check rather than let a wrong
+            // binding surface as a TypeError one layer further in.
+            if (! $client instanceof ClientInterface) {
+                throw InvalidConfiguration::httpClient(self::HTTP_CLIENT, $client);
+            }
+
             return new LinodeManager(
                 $this->app->make(Config::class),
-                $this->app->make(ClientInterface::class),
+                $client,
                 $this->app->make(RequestFactoryInterface::class),
                 $this->app->make(StreamFactoryInterface::class),
                 $this->app->make(LoggerInterface::class),

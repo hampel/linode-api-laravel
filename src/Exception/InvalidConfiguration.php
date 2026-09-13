@@ -29,6 +29,19 @@ final class InvalidConfiguration extends LinodeException
     }
 
     /**
+     * The transport's container key resolved to something that is not a PSR-18 client.
+     */
+    public static function httpClient(string $key, mixed $bound): self
+    {
+        return new self(sprintf(
+            '%s must be bound to a %s, not %s.',
+            $key,
+            \Psr\Http\Client\ClientInterface::class,
+            get_debug_type($bound)
+        ));
+    }
+
+    /**
      * The core package refused the version, page size or base URI.
      *
      * Wrapped rather than passed through, so the message names the configuration rather than

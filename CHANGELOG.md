@@ -1,5 +1,15 @@
 # CHANGELOG
 
+## Unreleased
+
+- **Breaking:** the HTTP transport is bound under `linode.http_client`, and
+  `Psr\Http\Client\ClientInterface` is no longer bound or read. An application that bound
+  `ClientInterface` to replace the transport must bind `linode.http_client` instead
+- The transport is no longer replaced by another package that binds `ClientInterface`, so this
+  package's own adapter and timeouts apply whatever else is installed
+- `InvalidConfiguration` is raised when `linode.http_client` is bound to something other than a
+  PSR-18 client
+
 ## 1.1.1 (2026-09-14)
 
 - A client resolved before `Http::swap()` now sends through the swapped-in factory, so its fakes

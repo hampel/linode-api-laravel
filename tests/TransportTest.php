@@ -6,6 +6,7 @@ namespace Hampel\Linode\Api\Laravel\Tests;
 
 use Hampel\Linode\Api\Exception\RequestException;
 use Hampel\Linode\Api\Laravel\Facades\Linode;
+use Hampel\Linode\Api\Laravel\LinodeServiceProvider;
 use Illuminate\Contracts\Config\Repository as Config;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Events\ConnectionFailed;
@@ -14,6 +15,7 @@ use Illuminate\Http\Client\Events\ResponseReceived;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\ServiceProvider;
 use PHPUnit\Framework\Attributes\Test;
 use Psr\Http\Client\ClientInterface;
 use Psr\Http\Message\RequestInterface;
@@ -24,10 +26,11 @@ final class TransportTest extends TestCase
     #[Test]
     public function a_replacement_transport_is_used_by_every_account(): void
     {
-        // The reason ClientInterface is bound by interface rather than constructed inside the
-        // manager: an application with its own outbound HTTP policy - a proxy-aware,
-        // SSRF-guarded client everything is required to go through - binds it here and this
-        // package uses it, instead of the application writing a second API client.
+        // The reason the transport is bound under a container key rather than constructed
+        // inside the manager: an application with its own outbound HTTP policy - a
+        // proxy-aware, SSRF-guarded client everything is required to go through - binds it
+        // under linode.http_client and this package uses it, instead of the application
+        // writing a second API client.
         $recorder = new class () implements ClientInterface {
             /** @var list<string> */
             public array $sent = [];
@@ -44,7 +47,7 @@ final class TransportTest extends TestCase
             }
         };
 
-        $this->container()->instance(ClientInterface::class, $recorder);
+        $this->container()->instance(LinodeServiceProvider::HTTP_CLIENT, $recorder);
 
         Linode::domains()->get(1);
         Linode::client('reseller')->domains()->get(2);
@@ -246,5 +249,82 @@ final class TransportTest extends TestCase
             && $request->url() === 'https://api.linode.com/v4/domains/1234/records/55'
             && $request['ttl_sec'] === 300
             && ! isset($request['hijacked']));
+    }
+
+    #[Test]
+    public function a_client_interface_bound_after_this_provider_does_not_reach_linode(): void
+    {
+        // Every Laravel API wrapper used to bind the unqualified PSR-18 interface, so in an
+        // application with two of them installed the last provider registered supplied the
+        // adapter for all of them - its timeouts, its defects, and in general no Http::fake()
+        // visibility at all. The adapter is now bound under linode.http_client, and the manager
+        // is built only from that.
+        $foreign = $this->foreignClient();
+        $this->container()->register($this->providerBinding($foreign));
+
+        $this->assertLinodeUsesItsOwnAdapter($foreign);
+    }
+
+    #[Test]
+    public function a_client_interface_bound_before_this_provider_is_left_alone(): void
+    {
+        // The other registration order. Linode used to win this one, by overwriting the other
+        // binding - which broke whichever package or application had made it. Now neither side
+        // touches the other.
+        $foreign = $this->foreignClient();
+        $this->container()->register($this->providerBinding($foreign));
+        $this->container()->register(new LinodeServiceProvider($this->container()), true);
+
+        $this->assertSame($foreign, $this->container()->make(ClientInterface::class));
+        $this->assertLinodeUsesItsOwnAdapter($foreign);
+    }
+
+    private function assertLinodeUsesItsOwnAdapter(object $foreign): void
+    {
+        $this->container()->make(Config::class)->set('linode.timeout', 7);
+
+        $options = null;
+        Http::fake(function (Request $request, array $sent) use (&$options) {
+            $options = $sent;
+
+            return Http::response(self::zone());
+        });
+
+        Linode::domains()->get(1234);
+
+        $this->assertSame(0, $foreign->sent ?? null, 'the foreign ClientInterface sent the Linode request');
+        $this->assertIsArray($options, 'Http::fake() did not see the Linode request');
+        $this->assertEquals(7, $options['timeout'] ?? null);
+    }
+
+    private function foreignClient(): object
+    {
+        return new class () implements ClientInterface {
+            public int $sent = 0;
+
+            public function sendRequest(RequestInterface $request): ResponseInterface
+            {
+                $this->sent++;
+
+                return new \GuzzleHttp\Psr7\Response(200, [], '{"id":1,"domain":"foreign.example.com","type":"master"}');
+            }
+        };
+    }
+
+    private function providerBinding(object $client): ServiceProvider
+    {
+        // Standing in for a sibling wrapper, or an unrelated library, that binds the interface.
+        return new class ($this->container(), $client) extends ServiceProvider {
+            public function __construct(\Illuminate\Contracts\Foundation\Application $app, private readonly object $client)
+            {
+                parent::__construct($app);
+            }
+
+            public function register(): void
+            {
+                $client = $this->client;
+                $this->app->singleton(ClientInterface::class, static fn (): object => $client);
+            }
+        };
     }
 }

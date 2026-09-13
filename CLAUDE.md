@@ -36,13 +36,23 @@ to exist.
 
 ## The adapter, and why it looks the way it does
 
-Five decisions in `PendingRequestClient` are load-bearing and each has a way of looking like
+Six decisions in the adapter and its binding are load-bearing and each has a way of looking like
 clutter to be tidied away:
 
 - **The pending request is rebuilt on every send.** `Factory::fake()` *replaces* the factory's
   stub collection, and `createPendingRequest()` copies whatever is there when it is called — so
   a client built once and kept holds a snapshot, and a fake registered after it was built never
   applies. `HttpFakeTest::faking_after_the_client_was_resolved_still_intercepts` is the test.
+- **The adapter is bound under `linode.http_client`, never under the PSR-18 interface, and the
+  manager is built only from that key.** `Psr\Http\Client\ClientInterface` is one container key
+  shared by everything, and every sibling Laravel API wrapper used to bind it: with two installed,
+  the provider registered last supplied every package's adapter, so a package's own timeouts and
+  fixes never ran — measured on 2026-09-14 in an application with three wrappers. **There is
+  deliberately no fallback to a `ClientInterface` bound elsewhere**, because an older sibling or an
+  unrelated library may be what bound it, and taking it would silently lose `Http::fake()`. The
+  `<config key>.http_client` shape is shared with the sibling wrappers so an application meets one
+  override style. `TransportTest` registers a foreign `ClientInterface` provider both before and
+  after this one; both tests failed against the old binding.
 - **The factory itself is resolved on every send, through a closure the provider passes.**
   `Http::swap(new Factory)` binds a new factory into the container, and a client holding the one
   it was built with sent past the new fakes and past its `preventStrayRequests()` — to the real

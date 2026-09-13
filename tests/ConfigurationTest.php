@@ -65,9 +65,22 @@ final class ConfigurationTest extends TestCase
     }
 
     #[Test]
-    public function the_transport_is_bound_by_interface_so_it_can_be_replaced(): void
+    public function the_transport_is_bound_under_its_own_key_so_it_can_be_replaced(): void
     {
-        $this->assertInstanceOf(PendingRequestClient::class, $this->container()->make(ClientInterface::class));
+        $this->assertInstanceOf(PendingRequestClient::class, $this->container()->make(LinodeServiceProvider::HTTP_CLIENT));
+    }
+
+    #[Test]
+    public function a_binding_under_the_key_that_is_not_a_psr18_client_is_refused_by_name(): void
+    {
+        // The other arm of the provider's check: without it a wrong binding would surface as a
+        // TypeError inside the manager's constructor, naming nothing an application configured.
+        $this->container()->instance(LinodeServiceProvider::HTTP_CLIENT, new \stdClass());
+
+        $this->expectException(\Hampel\Linode\Api\Laravel\Exception\InvalidConfiguration::class);
+        $this->expectExceptionMessage('linode.http_client must be bound to a Psr\\Http\\Client\\ClientInterface, not stdClass');
+
+        $this->container()->make(LinodeManager::class);
     }
 
     #[Test]
@@ -99,7 +112,8 @@ final class ConfigurationTest extends TestCase
         (new LinodeServiceProvider($app))->register();
 
         $this->assertTrue($app->bound(LinodeManager::class));
-        $this->assertTrue($app->bound(ClientInterface::class));
+        $this->assertTrue($app->bound(LinodeServiceProvider::HTTP_CLIENT));
+        $this->assertFalse($app->bound(ClientInterface::class), 'the shared PSR-18 key must be left to the application');
         $this->assertTrue($app->bound(RequestFactoryInterface::class));
         $this->assertTrue($app->bound(StreamFactoryInterface::class));
         $this->assertSame('main', $app->make(Config::class)->get('linode.default'));

@@ -310,9 +310,19 @@ Four things worth knowing:
   `Http::swap()`, because the transport resolves Laravel's HTTP factory at the moment of sending
   rather than when it was built.
 
-Replace the transport entirely by binding `Psr\Http\Client\ClientInterface`, which is how an
-application with its own outbound HTTP policy — a proxy-aware or SSRF-guarded client that
-everything is required to go through — makes this package use it.
+Replace the transport entirely by binding `linode.http_client`, which is how an application with
+its own outbound HTTP policy — a proxy-aware or SSRF-guarded client that everything is required
+to go through — makes this package use it:
+
+```php
+$this->app->singleton('linode.http_client', fn ($app) => $app->make(MyPolicyClient::class));
+```
+
+**Binding `Psr\Http\Client\ClientInterface` does not reach this package.** That key is shared by
+everything that speaks PSR-18, and the package deliberately neither binds it nor reads it, so
+installing another API wrapper — or any library that binds it — cannot take over Linode's
+transport. An application routing several API packages through one client binds each package's
+`<config key>.http_client`.
 
 ### What is not visible
 
