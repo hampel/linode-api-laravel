@@ -1,6 +1,6 @@
 # CHANGELOG
 
-## Unreleased
+## 1.2.0 (2026-09-14)
 
 - **Breaking:** the HTTP transport is bound under `linode.http_client`, and
   `Psr\Http\Client\ClientInterface` is no longer bound or read. An application that bound
