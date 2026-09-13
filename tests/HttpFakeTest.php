@@ -8,6 +8,9 @@ use Hampel\Linode\Api\Authentication\AccessToken;
 use Hampel\Linode\Api\Entity\Domain;
 use Hampel\Linode\Api\Exception\NotFoundException;
 use Hampel\Linode\Api\Laravel\Facades\Linode;
+use Hampel\Linode\Api\Laravel\Http\PendingRequestClient;
+use Illuminate\Contracts\Config\Repository as Config;
+use Illuminate\Http\Client\Factory;
 use Illuminate\Http\Client\Request;
 use Illuminate\Http\Client\StrayRequestException;
 use Illuminate\Support\Facades\Http;
@@ -196,5 +199,58 @@ final class HttpFakeTest extends TestCase
 
         Http::assertSent(fn (Request $request): bool => $request->url()
             === 'https://api.linode.com/v4beta/object-storage/quotas');
+    }
+
+    #[Test]
+    public function a_factory_swapped_in_after_the_client_was_resolved_is_the_one_consulted(): void
+    {
+        // Http::swap(new Factory) is the usual way to start a test from a clean set of fakes,
+        // because fake() merges. Facade::swap() binds the new instance into the container, so a
+        // transport that kept the factory it was built with would send past the new fakes.
+        //
+        // The base URI is a reserved .invalid host so that a regression cannot reach Linode: the
+        // old factory has no fakes and no stray-request guard, so it would send for real, and
+        // what it sends carries the configured token. It fails to resolve instead.
+        $this->container()->make(Config::class)->set('linode.base_uri', 'https://api.linode.invalid');
+        $client = Linode::client();
+
+        Http::swap(new Factory());
+        Http::preventStrayRequests();
+        Http::fake(['api.linode.invalid/*' => Http::response(self::zone())]);
+
+        $this->assertSame('example.com', $client->domains()->get(1234)->domain);
+        Http::assertSent(fn (Request $request): bool => $request->url() === 'https://api.linode.invalid/v4/domains/1234');
+    }
+
+    #[Test]
+    public function a_stray_request_is_refused_by_a_factory_swapped_in_after_resolution(): void
+    {
+        // The half that matters for safety: preventStrayRequests() on the swapped factory has to
+        // be the guard that applies, or a test believes nothing can escape while it does.
+        $this->container()->make(Config::class)->set('linode.base_uri', 'https://api.linode.invalid');
+        $client = Linode::client();
+
+        Http::swap(new Factory());
+        Http::preventStrayRequests();
+
+        $this->expectException(StrayRequestException::class);
+
+        $client->domains()->get(1234);
+    }
+
+    #[Test]
+    public function a_client_constructed_with_a_factory_instance_still_sends_through_it(): void
+    {
+        // The other arm of the constructor. The provider passes a closure; a Factory instance is
+        // still accepted so a client somebody built by hand keeps working. That form is fixed for
+        // the client's life, which is the documented trade, but it must still send.
+        $factory = new Factory();
+        $factory->fake(['api.linode.invalid/*' => Http::response(self::zone())]);
+
+        $client = new PendingRequestClient($factory, 10.0, 5.0);
+        $request = new \GuzzleHttp\Psr7\Request('GET', 'https://api.linode.invalid/v4/domains/1234');
+
+        $this->assertSame(200, $client->sendRequest($request)->getStatusCode());
+        $factory->assertSentCount(1);
     }
 }

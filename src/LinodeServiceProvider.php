@@ -61,10 +61,13 @@ final class LinodeServiceProvider extends ServiceProvider
         $this->app->singleton(ClientInterface::class, function (): ClientInterface {
             $config = $this->app->make(Config::class);
 
-            // The same Factory instance the Http facade resolves, which is what puts this
-            // package's requests among the ones Http::fake() and Http::assertSent() see.
+            // The Factory the Http facade resolves, looked up again on every send, which is
+            // what puts this package's requests among the ones Http::fake() and
+            // Http::assertSent() see - including after Http::swap() has replaced it.
+            $app = $this->app;
+
             return new PendingRequestClient(
-                $this->app->make(HttpClientFactory::class),
+                static fn (): HttpClientFactory => $app->make(HttpClientFactory::class),
                 $this->seconds($config->get('linode.timeout'), 10.0),
                 $this->seconds($config->get('linode.connect_timeout'), 5.0),
             );

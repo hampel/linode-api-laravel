@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Hampel\Linode\Api\Laravel\Http;
 
+use Closure;
 use GuzzleHttp\RequestOptions;
 use GuzzleHttp\TransferStats;
 use GuzzleHttp\Utils;
@@ -39,6 +40,13 @@ use Psr\Http\Message\ResponseInterface;
  * request would go to the real API. Rebuilding here means the stubs, the stray-request
  * setting, `Http::globalOptions()` and `Http::globalRequestMiddleware()` are all read at the
  * moment of sending, so ordering stops mattering.
+ *
+ * THE FACTORY IS RESOLVED PER REQUEST TOO, for the same reason one level up. Http::swap(new
+ * Factory) - the usual way for a test to start from a clean set of fakes, since fake() merges -
+ * binds a NEW factory into the container. A client holding the factory it was constructed with
+ * would keep sending through the old one: past the new fakes, past the new factory's
+ * preventStrayRequests(), and to the real API with the configured token. So the provider hands
+ * in a closure over the container rather than the factory itself.
  *
  * The Guzzle handler underneath is built once and reused, which is what stops that costing
  * anything: the handler owns curl's connection pool, so keep-alive survives between requests
@@ -87,8 +95,14 @@ final class PendingRequestClient implements ClientInterface
      */
     private $handler = null;
 
+    /**
+     * @param  Factory|Closure(): Factory  $factory  a closure resolving the factory at the moment
+     *         of sending, which is what follows Http::swap(). A Factory instance is still
+     *         accepted so a hand-built client keeps working, but it is fixed for the life of the
+     *         client and a later swap will not reach it.
+     */
     public function __construct(
-        private readonly Factory $factory,
+        private readonly Factory|Closure $factory,
         private readonly float $timeout,
         private readonly float $connectTimeout,
     ) {
@@ -96,12 +110,16 @@ final class PendingRequestClient implements ClientInterface
 
     public function sendRequest(RequestInterface $request): ResponseInterface
     {
-        $this->handler ??= Utils::chooseHandler();
+        // Into a local first: a property narrowed by ??= loses that narrowing across the closure
+        // call below, as far as static analysis is concerned.
+        $handler = $this->handler ??= Utils::chooseHandler();
 
-        return $this->factory->createPendingRequest()
+        $factory = $this->factory instanceof Closure ? ($this->factory)() : $this->factory;
+
+        return $factory->createPendingRequest()
             ->timeout($this->timeout)
             ->connectTimeout($this->connectTimeout)
-            ->setHandler($this->handler)
+            ->setHandler($handler)
             ->buildClient()
             ->send($request, [
                 RequestOptions::SYNCHRONOUS => true,
