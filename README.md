@@ -1,4 +1,4 @@
-# hampel/linode-api-laravel
+# Linode API for Laravel
 
 [![Tests](https://github.com/hampel/linode-api-laravel/actions/workflows/tests.yml/badge.svg)](https://github.com/hampel/linode-api-laravel/actions/workflows/tests.yml)
 [![Latest Version on Packagist](https://img.shields.io/packagist/v/hampel/linode-api-laravel.svg?style=flat-square)](https://packagist.org/packages/hampel/linode-api-laravel)
