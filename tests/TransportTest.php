@@ -4,9 +4,15 @@ declare(strict_types=1);
 
 namespace Hampel\Linode\Api\Laravel\Tests;
 
+use Hampel\Linode\Api\Exception\RequestException;
 use Hampel\Linode\Api\Laravel\Facades\Linode;
 use Illuminate\Contracts\Config\Repository as Config;
+use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Http\Client\Events\ConnectionFailed;
+use Illuminate\Http\Client\Events\RequestSending;
+use Illuminate\Http\Client\Events\ResponseReceived;
 use Illuminate\Http\Client\Request;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Http;
 use PHPUnit\Framework\Attributes\Test;
 use Psr\Http\Client\ClientInterface;
@@ -91,5 +97,72 @@ final class TransportTest extends TestCase
         Linode::domains()->list();
 
         Http::assertSent(fn (Request $request): bool => str_contains($request->url(), 'page_size=25'));
+    }
+
+    #[Test]
+    public function request_sending_fires_and_response_received_does_not(): void
+    {
+        // Half of Laravel's HTTP client events reach this traffic, and which half matters to
+        // anyone listening. PendingRequest's constructor registers a before-sending callback
+        // that dispatches RequestSending, and that callback runs inside the handler stack
+        // PendingRequestClient drives - so it fires. ResponseReceived is dispatched from
+        // PendingRequest::send(), a layer above the stack, which the adapter never calls - so
+        // it does not. A listener pairing the two counts requests that never get a response.
+        //
+        // Two requests rather than one, so a count of 1 cannot be an event fired once when the
+        // client was resolved rather than per request.
+        $sending = 0;
+        $received = 0;
+        Event::listen(RequestSending::class, function () use (&$sending): void {
+            $sending++;
+        });
+        Event::listen(ResponseReceived::class, function () use (&$received): void {
+            $received++;
+        });
+
+        Http::fake(['api.linode.com/*' => Http::response(self::zone())]);
+
+        // The control. Through Laravel's own PendingRequest::send() both events fire, so a zero
+        // below means the adapter's path skipped the event - not that the listener was never
+        // wired to the dispatcher the HTTP factory uses.
+        Http::get('https://api.linode.com/v4/domains/1234');
+        $this->assertSame([1, 1], [$sending, $received]);
+
+        Linode::domains()->get(1234);
+        Linode::domains()->get(1234);
+
+        $this->assertSame(3, $sending);
+        $this->assertSame(1, $received);
+    }
+
+    #[Test]
+    public function connection_failed_does_not_fire_either(): void
+    {
+        // The other event Telescope's HTTP client watcher listens for, alongside
+        // ResponseReceived. Laravel raises it from PendingRequest::send() too, so a failed
+        // connection is invisible to Telescope as well - and arrives as the core package's own
+        // RequestException, which is what the core's PSR-3 logging records.
+        $failed = 0;
+        Event::listen(ConnectionFailed::class, function () use (&$failed): void {
+            $failed++;
+        });
+
+        Http::fake(['api.linode.com/*' => Http::failedConnection()]);
+
+        // The control, as above: Laravel's own send() path does raise it.
+        try {
+            Http::get('https://api.linode.com/v4/domains/1234');
+            $this->fail('Expected a ConnectionException.');
+        } catch (ConnectionException) {
+        }
+        $this->assertSame(1, $failed);
+
+        try {
+            Linode::domains()->get(1234);
+            $this->fail('Expected a RequestException.');
+        } catch (RequestException) {
+        }
+
+        $this->assertSame(1, $failed);
     }
 }

@@ -117,9 +117,19 @@ The core package's `Config` validates all three, and the manager re-raises its
 - **`X-Filter` is a request header, so a filtered lookup leaves no evidence in the URL.** A
   consumer asserting that it looked a zone up by name has to match on the header.
   `HttpFakeTest::the_filter_header_is_visible_to_an_assertion` is the demonstration.
-- **Laravel's `RequestSending` / `ResponseReceived` events do not fire.** They are raised in
-  `PendingRequest::send()`, a layer above the handler stack. Telescope's HTTP client watcher
-  will not show this traffic; the core package's PSR-3 logging is what does.
+- **`ResponseReceived` and `ConnectionFailed` do not fire; `RequestSending` does.** The first two
+  are dispatched from `PendingRequest::send()`, a layer above the handler stack, which the
+  adapter never calls. `RequestSending` comes from a before-sending callback that
+  `PendingRequest`'s constructor registers, and `buildBeforeSendingHandler()` runs it *inside*
+  the stack that `buildClient()->send()` drives. Telescope's HTTP client watcher listens for
+  `ResponseReceived` and `ConnectionFailed` only, so it still shows nothing; the core package's
+  PSR-3 logging is what does.
+
+  This package's docs said all of it did not fire until 2026-09-13 — a correct conclusion
+  resting on a half-false mechanism, found when an `Event::assertNothingDispatched()` in a
+  consuming test counted a `RequestSending`. `TransportTest` now measures
+  all three, **each against Laravel's own `Http::get()` as a control**, because an
+  `assertSame(0, …)` on an event count passes just as well when the listener was never wired.
 - **`failOnDeprecation` is inert in a Testbench package without help.** Laravel's
   `HandleExceptions` replaces PHPUnit's error handler when the application boots.
   `withoutDeprecationHandling()` in `setUp()` fixes it for test-executed paths — but the

@@ -1,5 +1,10 @@
 # CHANGELOG
 
+## Unreleased
+
+- Corrected the documentation of Laravel's HTTP client events: `RequestSending` fires for
+  requests the API client makes; `ResponseReceived` and `ConnectionFailed` do not
+
 ## 1.0.0 (2026-09-13)
 
 Initial release.

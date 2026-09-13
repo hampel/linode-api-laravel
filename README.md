@@ -278,10 +278,15 @@ everything is required to go through — makes this package use it.
 
 ### What is not visible
 
-Laravel raises its `RequestSending` and `ResponseReceived` events from a layer above the handler
-stack, and this package sends through the stack directly, so those events do not fire — anything
-listening for them, including Telescope's HTTP client watcher, will not show this traffic. The
-core package logs every request through PSR-3 instead, which reaches the application log:
+**`ResponseReceived` and `ConnectionFailed` do not fire for this traffic, so Telescope's HTTP
+client watcher — which listens for exactly those two — will not show it.** Laravel raises both
+from a layer above the handler stack, and this package sends through the stack directly.
+
+**`RequestSending` does fire**, once per request, because Laravel raises it from inside the stack.
+A listener that pairs `RequestSending` with `ResponseReceived` will therefore see requests that
+never get a response, and `Event::assertNothingDispatched()` will count them.
+
+The core package logs every request through PSR-3 instead, which reaches the application log:
 requests at `debug`, failures at `error`, and a nearly-spent rate limit at `warning`. The token
 is never logged.
 
