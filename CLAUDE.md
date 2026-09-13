@@ -150,11 +150,18 @@ The core package's `Config` validates all three, and the manager re-raises its
   container by hand because Testbench always boots a full application and can never reach this.
 
   **Laravel Zero also ignores package discovery**, which that test cannot see: its `Application`
-  sets the package manifest to `[]`, so a consumer lists the provider in `config/app.php`, the
-  global `Linode` alias never exists, and there is no `vendor:publish`. The facade imported by
-  class name works, and `Http::fake()` intercepts through it. The README said the reverse until
-  2026-09-13, when a consuming Laravel Zero tool met a null `config('linode')` on its first call;
-  every part of the corrected README was then measured in a Laravel Zero 13.0.0 application.
+  sets the package manifest to `[]`, so a consumer lists the provider in `config/app.php` and
+  the global `Linode` alias never exists. The facade imported by class name works, and
+  `Http::fake()` intercepts through it. `vendor:publish --tag=linode-config` works too, once the
+  provider is listed — `publishes()` runs in the provider's `boot()` — but Laravel Zero lists it
+  under `hidden` in `config/commands.php`, so it is absent from `list`.
+
+  The README said the reverse of the discovery part until 2026-09-13, when a consuming Laravel
+  Zero tool met a null `config('linode')` on its first call. **The correction then claimed
+  there was no `vendor:publish`, and was wrong the same day**: it was checked with `list`, which
+  cannot see a hidden command, and a publish attempted without the provider answers `No
+  publishable resources` — which reads as confirmation. Run the command, with the provider
+  listed, before concluding a Laravel Zero command is missing.
 
 - **`composer-require-checker` carries the undeclared-dependency check here, not the dev-free
   PHPStan job.** `laravel/framework` `replace`s every `illuminate/*` component, so the framework

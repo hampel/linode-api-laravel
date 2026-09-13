@@ -77,9 +77,13 @@ examples below already do:
 use Hampel\Linode\Api\Laravel\Facades\Linode;
 ```
 
-Laravel Zero has no `vendor:publish` either. The environment variables below cover the shipped
-configuration; to edit its structure — to add a second account, say — copy
-`vendor/hampel/linode-api-laravel/config/linode.php` to `config/linode.php`.
+**`vendor:publish` works, but only once the provider is listed**, and Laravel Zero hides it from
+`list`. Before that it answers `No publishable resources for tag [linode-config]` and writes
+nothing, which reads as unsupported. With the provider in `config/app.php`:
+
+```bash
+php <app> vendor:publish --tag=linode-config
+```
 
 ## Configuration
 
