@@ -52,7 +52,11 @@ clutter to be tidied away:
   unrelated library may be what bound it, and taking it would silently lose `Http::fake()`. The
   `<config key>.http_client` shape is shared with the sibling wrappers so an application meets one
   override style. `TransportTest` registers a foreign `ClientInterface` provider both before and
-  after this one; both tests failed against the old binding.
+  after this one; both tests failed against the old binding. **A recorder stub is not the
+  realistic sibling**: another wrapper's adapter is a `PendingRequestClient` on the same faked
+  factory, so the fake answers whichever adapter sends and only the timeout differs.
+  `a_sibling_adapter_that_is_also_faked_does_not_lend_its_timeout` covers that shape, and against
+  the old binding it failed with the sibling's 3.0 in place of `linode.timeout`.
 
   **The key is bound with `singletonIf()`, so an application's own binding survives provider
   order.** A full Laravel application registers discovered packages before its own providers, so

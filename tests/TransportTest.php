@@ -6,16 +6,19 @@ namespace Hampel\Linode\Api\Laravel\Tests;
 
 use Hampel\Linode\Api\Exception\RequestException;
 use Hampel\Linode\Api\Laravel\Facades\Linode;
+use Hampel\Linode\Api\Laravel\Http\PendingRequestClient;
 use Hampel\Linode\Api\Laravel\LinodeServiceProvider;
 use Illuminate\Contracts\Config\Repository as Config;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Events\ConnectionFailed;
 use Illuminate\Http\Client\Events\RequestSending;
 use Illuminate\Http\Client\Events\ResponseReceived;
+use Illuminate\Http\Client\Factory as HttpClientFactory;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\ServiceProvider;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Test;
 use Psr\Http\Client\ClientInterface;
 use Psr\Http\Message\RequestInterface;
@@ -277,6 +280,65 @@ final class TransportTest extends TestCase
 
         $this->assertSame($foreign, $this->container()->make(ClientInterface::class));
         $this->assertLinodeUsesItsOwnAdapter($foreign);
+    }
+
+    /**
+     * @return array<string, array{bool}>
+     */
+    public static function siblingOrders(): array
+    {
+        return [
+            'sibling registered after this provider' => [false],
+            'sibling registered before this provider' => [true],
+        ];
+    }
+
+    #[Test]
+    #[DataProvider('siblingOrders')]
+    public function a_sibling_adapter_that_is_also_faked_does_not_lend_its_timeout(bool $siblingFirst): void
+    {
+        // The realistic sibling, which the recorder stubs above are not. Another Laravel API
+        // wrapper's adapter is a PendingRequestClient too, resolving the same faked factory, so
+        // Http::fake() intercepts whichever adapter sends and the response looks right either way.
+        // Only the timeout tells them apart - which is how the shared-binding defect showed up in
+        // an application with three wrappers: one package's calls bounded by another's timeout.
+        //
+        // The sibling resolves the application's own factory, as a real sibling's provider does, so
+        // a regression reaches the fake rather than the network; the .invalid host is a second
+        // guard in case it ever does not.
+        $sibling = new class ($this->container()) extends ServiceProvider {
+            public function register(): void
+            {
+                $app = $this->app;
+
+                $this->app->singleton(ClientInterface::class, static fn (): ClientInterface => new PendingRequestClient(
+                    static fn (): HttpClientFactory => $app->make(HttpClientFactory::class),
+                    3.0,
+                    1.0,
+                ));
+            }
+        };
+
+        $this->container()->register($sibling);
+
+        if ($siblingFirst) {
+            $this->container()->register(new LinodeServiceProvider($this->container()), true);
+        }
+
+        $config = $this->container()->make(Config::class);
+        $config->set('linode.timeout', 7);
+        $config->set('linode.base_uri', 'https://api.linode.invalid');
+
+        $options = null;
+        Http::fake(function (Request $request, array $sent) use (&$options) {
+            $options = $sent;
+
+            return Http::response(self::zone());
+        });
+
+        $this->assertSame('example.com', Linode::domains()->get(1234)->domain);
+        $this->assertIsArray($options);
+        $this->assertEquals(7, $options['timeout'] ?? null, "the Linode request carried the sibling's timeout");
     }
 
     private function assertLinodeUsesItsOwnAdapter(object $foreign): void
