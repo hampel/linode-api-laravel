@@ -1,6 +1,6 @@
 # CHANGELOG
 
-## Unreleased
+## 1.1.0 (2026-09-13)
 
 - `LINODE_API_TOKEN` is the documented token variable. `LINODE_TOKEN` is still read when
   `LINODE_API_TOKEN` is unset or empty
