@@ -21,4 +21,4 @@ Initial release.
 - `UnknownAccount` and `InvalidConfiguration` extend the core package's `LinodeException`. An
   account with no token, and a version or page size the API would refuse, are reported when the
   client is built
-- Requires `hampel/linode-api` `^0.2`, PHP 8.3, and Laravel 12 or 13
+- Requires `hampel/linode-api` `^1.0`, PHP 8.3, and Laravel 12 or 13

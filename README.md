@@ -293,10 +293,15 @@ requests are safe to retry is the application's knowledge, not this package's.
 
 ## Versioning
 
-`hampel/linode-api` is 0.x, so its public API can change in a minor release and this package
-constrains it at `^0.2` and expects to bump again. One open question there could still move a
-signature — what a record's `ttl_sec` of 0 inherits — which is why nothing here proxies
-`DomainRecord::effectiveTtl()`.
+`hampel/linode-api` is constrained at `^1.0`. From 1.0.0 a break in any of its classes,
+methods or signatures means a new major, so an upgrade inside `^1.0` cannot move anything this
+package hands you.
+
+What that stability covers is the whole of the core package's surface: request building,
+filtering, the entities, and the exception hierarchy. This package adds the transport, the
+manager and the facade, and its own exceptions extend the core's — so an application catching
+`Hampel\Linode\Api\Exception\ExceptionInterface` is already catching everything either package
+raises.
 
 ## License
 

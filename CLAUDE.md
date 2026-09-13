@@ -167,21 +167,31 @@ The core package's `Config` validates all three, and the manager re-raises its
 `Linode::domains()` goes through the manager's `__call()` and returns `mixed`; the
 `@method static` block is what makes `Linode::domains()->all()` analysable. So an accessor added
 to the core package's `Client` in a later release is a call that works at runtime and silently
-loses its type — and the core package is 0.x and expected to grow accessors, so this is cheaper
-to have from the start than to add after the first one is missed.
+loses its type. The core package reaching 1.0.0 does not retire that risk, because an accessor
+is an addition rather than a break and a minor release is free to make one — which is the
+release a consumer upgrades into without reading anything.
 `tests/FacadeConformanceTest.php` compares the two lists in both directions and checks every
 annotated return type resolves.
 
 The manager needs the same coverage and gets it from one `@mixin Client` line, which cannot
 drift. The facade cannot use `@mixin` because `__callStatic()` needs `@method static`.
 
-## Do not proxy `DomainRecord::effectiveTtl()`
+## Nothing here re-exposes an entity method, and `effectiveTtl()` is why
 
-The core package is deliberately 0.x because that signature may still gain a parameter: what a
-record's `ttl_sec` of 0 inherits — the fixed 86400 or the zone's own TTL — is undocumented and
-unmeasured, and settling it the other way changes the method. Nothing here re-exposes it, and a
-convenience wrapper or a `@method` line naming its return type would pin a signature this
-package does not own.
+The rule outlived the case that produced it, which is the reason to keep it written down rather
+than delete it.
+
+`DomainRecord::effectiveTtl()` was the open question that kept the core package at 0.x: whether
+a record's `ttl_sec` of 0 inherits the fixed 86400 or the zone's own TTL was undocumented, and
+the two answers give the method different signatures. It has since been settled by measurement —
+it inherits the zone's, proven by moving a live zone's TTL and watching the zero-TTL records
+follow — and the method gained an optional `$zone` parameter in the core's 0.3.0 before freezing
+at 1.0.0.
+
+**So the specific risk is closed and the practice stands.** An entity method reached through a
+facade `@method` line or a convenience wrapper here is a signature this package would be
+pinning and does not own; a consumer calls it on the entity the core package handed them. The
+facade annotates the client's accessors and stops there.
 
 ## No harness
 

@@ -26,7 +26,7 @@
         "php": ">=8.3",
         "guzzlehttp/guzzle": "^7.8|^8.0",
         "guzzlehttp/psr7": "^2.0|^3.0",
-        "hampel/linode-api": "^0.2",
+        "hampel/linode-api": "^1.0",
         "illuminate/contracts": "^12.0|^13.0",
         "illuminate/http": "^12.0|^13.0",
         "illuminate/support": "^12.0|^13.0",
