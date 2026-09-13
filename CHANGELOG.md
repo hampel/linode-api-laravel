@@ -1,6 +1,6 @@
 # CHANGELOG
 
-## Unreleased
+## 1.1.1 (2026-09-14)
 
 - A client resolved before `Http::swap()` now sends through the swapped-in factory, so its fakes
   and `preventStrayRequests()` apply
