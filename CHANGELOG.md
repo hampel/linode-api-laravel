@@ -1,6 +1,6 @@
 # CHANGELOG
 
-## Unreleased
+## 1.2.1 (2026-09-14)
 
 - README: from `hampel/linode-api` 1.2.0 the core package logs at `debug` only, and failures are
   raised rather than logged
