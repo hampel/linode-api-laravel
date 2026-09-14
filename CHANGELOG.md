@@ -1,5 +1,10 @@
 # CHANGELOG
 
+## Unreleased
+
+- README: from `hampel/linode-api` 1.2.0 the core package logs at `debug` only, and failures are
+  raised rather than logged
+
 ## 1.2.0 (2026-09-14)
 
 - **Breaking:** the HTTP transport is bound under `linode.http_client`, and

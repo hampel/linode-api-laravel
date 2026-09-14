@@ -93,8 +93,8 @@ use Psr\Http\Message\ResponseInterface;
  * traffic. RequestSending DOES fire, because Laravel raises it from a before-sending callback
  * that PendingRequest's constructor registers inside the stack; a listener that counts requests
  * on it and pairs them with responses will count requests that never get one. TransportTest
- * measures all three against Laravel's own send() as a control. The package logs every request
- * through PSR-3 instead, which under Laravel reaches the application log.
+ * measures all three against Laravel's own send() as a control. The core package logs every
+ * request through PSR-3 at debug instead; a failure is raised as an exception, not logged.
  */
 final class PendingRequestClient implements ClientInterface
 {

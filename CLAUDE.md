@@ -170,8 +170,9 @@ The core package's `Config` validates all three, and the manager re-raises its
   adapter never calls. `RequestSending` comes from a before-sending callback that
   `PendingRequest`'s constructor registers, and `buildBeforeSendingHandler()` runs it *inside*
   the stack that `buildClient()->send()` drives. Telescope's HTTP client watcher listens for
-  `ResponseReceived` and `ConnectionFailed` only, so it still shows nothing; the core package's
-  PSR-3 logging is what does.
+  `ResponseReceived` and `ConnectionFailed` only, so it still shows nothing. The core package's
+  PSR-3 logging is the record instead, and from its 1.2.0 that is `debug` only: failures are raised
+  as exceptions, never logged.
 
   This package's docs said all of it did not fire until 2026-09-13 — a correct conclusion
   resting on a half-false mechanism, found when an `Event::assertNothingDispatched()` in a

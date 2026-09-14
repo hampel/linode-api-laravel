@@ -338,9 +338,10 @@ from a layer above the handler stack, and this package sends through the stack d
 A listener that pairs `RequestSending` with `ResponseReceived` will therefore see requests that
 never get a response, and `Event::assertNothingDispatched()` will count them.
 
-The core package logs every request through PSR-3 instead, which reaches the application log:
-requests at `debug`, failures at `error`, and a nearly-spent rate limit at `warning`. The token
-is never logged.
+The core package logs every request through PSR-3 instead, which reaches the application log.
+From `hampel/linode-api` 1.2.0 that is `debug` only — each request, and a nearly-spent rate limit.
+**Failures are raised, not logged**, so an error reaches the log only if the application reports
+the exception. The token is never logged.
 
 ## What this package will not do
 
