@@ -43,13 +43,25 @@ final class LaravelZeroTest extends \PHPUnit\Framework\TestCase
     public function a_fake_registered_after_the_client_was_resolved_still_intercepts(): void
     {
         // The realistic ordering: a command resolves its client, and the test fakes after.
-        // Without the singleton below this reached the network.
+        //
+        // This used to be what the factory singleton was tested by, and it no longer is.
+        // Measured 2026-09-14 with the singleton removed: this test still passes, because the
+        // adapter now resolves the factory from the container on every send and Http::fake()
+        // binds its instance there via Facade::swap(). What it pins is that per-send resolution
+        // in a container without the framework's own binding; the singleton itself is pinned by
+        // the_http_factory_is_bound_as_a_singleton_when_nothing_else_binds_one, which does fail.
+        //
+        // Contained twice, because a regression to a held factory is a real request, and the
+        // guard set here would land on the facade's factory rather than the one the package
+        // held. The reserved .invalid host is what fails to resolve.
         $app = $this->laravelZeroApplication();
+        $app->make('config')->set('linode.base_uri', 'https://api.linode.invalid');
 
         $client = $app->make(LinodeManager::class)->client('main');
 
+        Http::preventStrayRequests();
         Http::fake([
-            'api.linode.com/*' => Http::response([
+            'api.linode.invalid/*' => Http::response([
                 'id' => 1234,
                 'domain' => 'example.com',
                 'type' => 'master',

@@ -104,11 +104,16 @@ final class HttpFakeTest extends TestCase
         // called - so a Guzzle client built at resolution time holds a snapshot taken before
         // these stubs existed, and the request would go to the real API. PendingRequestClient
         // rebuilds per send, so it does not.
+        //
+        // A regression here is a real request, and preventStrayRequests() cannot contain it: a
+        // snapshot taken before this test switched the guard on would not carry it either. The
+        // reserved .invalid host is what makes that fail to resolve rather than reach Linode.
+        $this->container()->make(Config::class)->set('linode.base_uri', 'https://api.linode.invalid');
         $client = Linode::client();
 
         Http::preventStrayRequests();
         Http::fake([
-            'api.linode.com/*' => Http::response(self::zone(4321, 'late.example.com')),
+            'api.linode.invalid/*' => Http::response(self::zone(4321, 'late.example.com')),
         ]);
 
         $this->assertSame('late.example.com', $client->domains()->get(4321)->domain);
@@ -120,11 +125,16 @@ final class HttpFakeTest extends TestCase
         // Not disguised as the package's RequestException. Connection::dispatch() catches
         // ClientExceptionInterface, and StrayRequestException is a plain RuntimeException, so
         // it arrives with Laravel's own message and the URL still in it.
+        //
+        // On a .invalid host, so that a regression in the guard fails to resolve rather than
+        // sending the request this test exists to stop.
+        $this->container()->make(Config::class)->set('linode.base_uri', 'https://api.linode.invalid');
+
         Http::preventStrayRequests();
         Http::fake(['example.test/*' => Http::response([])]);
 
         $this->expectException(StrayRequestException::class);
-        $this->expectExceptionMessage('https://api.linode.com/v4/domains/1234');
+        $this->expectExceptionMessage('https://api.linode.invalid/v4/domains/1234');
 
         Linode::domains()->get(1234);
     }
