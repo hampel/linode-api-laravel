@@ -95,7 +95,8 @@ LINODE_API_TOKEN=your-personal-access-token
 ```
 
 `LINODE_TOKEN`, the name earlier releases documented, is still read when `LINODE_API_TOKEN` is unset
-or empty, so an existing `.env` keeps working.
+or empty, so an existing `.env` keeps working — unless the application published its config before
+1.1.0; see [Your own config file](#your-own-config-file).
 
 **A personal access token and an OAuth access token are the same thing here.** Linode does not
 distinguish them on the wire: same header, same scopes, same `X-OAuth-Scopes` in the reply. So
@@ -126,6 +127,21 @@ which sends whoever is debugging it to the wrong place. It raises
 `LinodeException`, so an application already catching that catches misconfiguration too. An
 empty string counts as no token: an unset environment variable reaches config as `""` as readily
 as it reaches it as `null`.
+
+### Your own config file
+
+**An application's `config/linode.php` overrides the package's key by key, and replaces
+`accounts` whole.** The package merges its defaults underneath with `mergeConfigFrom()`, which
+merges only the top level: any key the application's file sets wins, whatever it meant there, and
+the application's `accounts` array is used instead of the package's rather than merged into it.
+
+**A config published before 1.1.0 reads only `LINODE_TOKEN`.** Its `accounts` array still says
+`env('LINODE_TOKEN')`, so setting `LINODE_API_TOKEN` alone leaves the account with no token. Keep
+`LINODE_TOKEN`, or change that line to:
+
+```php
+'token' => env('LINODE_API_TOKEN') ?: env('LINODE_TOKEN'),
+```
 
 ### Which API, and how much of it per request
 

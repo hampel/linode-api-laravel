@@ -1,5 +1,10 @@
 # CHANGELOG
 
+## Unreleased
+
+- README: an application's own `config/linode.php` overrides the package's keys and replaces
+  `accounts`; a config published before 1.1.0 reads only `LINODE_TOKEN`
+
 ## 1.2.1 (2026-09-14)
 
 - README: from `hampel/linode-api` 1.2.0 the core package logs at `debug` only, and failures are
