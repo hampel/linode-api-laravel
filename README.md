@@ -359,11 +359,11 @@ From `hampel/linode-api` 1.2.0 that is `debug` only — each request, and a near
 **Failures are raised, not logged**, so an error reaches the log only if the application reports
 the exception. The token is never logged.
 
-## What this package will not do
+## Retries
 
-Grow retries or backoff. `ResponseMeta` carries the rate limit on every response and
-`TooManyRequestsException` is typed, so an application can slow itself down or retry; which
-requests are safe to retry is the application's knowledge, not this package's.
+**This package does not retry or back off.** `ResponseMeta` carries the rate limit on every
+response and `TooManyRequestsException` is typed, so an application can slow itself down or retry;
+which requests are safe to retry is the application's knowledge, not this package's.
 
 ## Versioning
 
@@ -377,7 +377,7 @@ manager and the facade, and its own exceptions extend the core's — so an appli
 `Hampel\Linode\Api\Exception\ExceptionInterface` is already catching everything either package
 raises.
 
-## License
+## Licence
 
 MIT. See [LICENSE.md](LICENSE.md).
 
