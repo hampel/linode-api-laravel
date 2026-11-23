@@ -148,10 +148,18 @@ final class TransportTest extends TestCase
         // ResponseReceived. Laravel raises it from PendingRequest::send() too, so a failed
         // connection is invisible to Telescope as well - and arrives as the core package's own
         // RequestException, which is what the core's PSR-3 logging records.
+        //
+        // Read through a closure rather than as the variable. The listener changes the count by
+        // reference, which PHPStan cannot see: 2.3.7 narrows the variable to the 1 asserted
+        // after the control and reports the assertion that matters - the one after the Linode
+        // call - as always true. 2.1.32 did not.
         $failed = 0;
         Event::listen(ConnectionFailed::class, function () use (&$failed): void {
             $failed++;
         });
+        $failures = function () use (&$failed): int {
+            return $failed;
+        };
 
         Http::fake(['api.linode.com/*' => Http::failedConnection()]);
 
@@ -172,7 +180,7 @@ final class TransportTest extends TestCase
         }
 
         $this->assertInstanceOf(ConnectionException::class, $thrown);
-        $this->assertSame(1, $failed);
+        $this->assertSame(1, $failures());
 
         try {
             Linode::domains()->get(1234);
@@ -180,7 +188,7 @@ final class TransportTest extends TestCase
         } catch (RequestException) {
         }
 
-        $this->assertSame(1, $failed);
+        $this->assertSame(1, $failures());
     }
 
     #[Test]
