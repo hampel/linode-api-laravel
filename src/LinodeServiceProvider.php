@@ -26,17 +26,19 @@ use Psr\Log\LoggerInterface;
  * which is what makes the package's traffic visible to Http::fake() - see PendingRequestClient.
  *
  * NOT THE PSR-18 INTERFACE, DELIBERATELY. That is one container key shared by everything that
- * speaks PSR-18, and the sibling Laravel API wrappers used to claim it too: with two installed,
- * the provider registered last supplied every package's adapter, with its own timeouts, and a
- * package's own fixes never ran. A package-specific key cannot collide, and there is no
- * fallback to a ClientInterface bound elsewhere - an older sibling or an unrelated library could
- * be the one that bound it, and the manager would silently take it, losing Http::fake().
+ * speaks PSR-18, and other Laravel API wrappers of this design used to claim it too: with two
+ * installed, the provider registered last supplied every package's adapter, with its own
+ * timeouts, and a package's own fixes never ran. A package-specific key cannot collide, and
+ * there is no fallback to a ClientInterface bound elsewhere - an older wrapper or an unrelated
+ * library could be the one that bound it, and the manager would silently take it, losing
+ * Http::fake().
  */
 final class LinodeServiceProvider extends ServiceProvider
 {
     /**
      * The container key the transport is bound under, and the documented override point. The
-     * same `<config key>.http_client` shape as the sibling wrappers, so an application meets one
+     * same `<config key>.http_client` shape as hampel/binarylane-api-laravel,
+     * hampel/cloudflare-api-laravel and hampel/xenforo-api-laravel, so an application meets one
      * override style.
      */
     public const HTTP_CLIENT = 'linode.http_client';
@@ -77,7 +79,7 @@ final class LinodeServiceProvider extends ServiceProvider
         // providers register in. A full Laravel application registers discovered packages before
         // its own providers, but Laravel Zero registers config/app.php in list order, and an
         // AppServiceProvider listed first would otherwise have its override replaced here,
-        // silently. No sibling package binds this key, so keeping an existing binding cannot
+        // silently. No other package binds this key, so keeping an existing binding cannot
         // bring back the shared-PSR-18 collision.
         $this->app->singletonIf(self::HTTP_CLIENT, function (): ClientInterface {
             $config = $this->app->make(Config::class);

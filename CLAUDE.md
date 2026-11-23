@@ -45,18 +45,20 @@ clutter to be tidied away:
   applies. `HttpFakeTest::faking_after_the_client_was_resolved_still_intercepts` is the test.
 - **The adapter is bound under `linode.http_client`, never under the PSR-18 interface, and the
   manager is built only from that key.** `Psr\Http\Client\ClientInterface` is one container key
-  shared by everything, and every sibling Laravel API wrapper used to bind it: with two installed,
-  the provider registered last supplied every package's adapter, so a package's own timeouts and
-  fixes never ran — measured on 2026-09-14 in an application with three wrappers. **There is
-  deliberately no fallback to a `ClientInterface` bound elsewhere**, because an older sibling or an
-  unrelated library may be what bound it, and taking it would silently lose `Http::fake()`. The
-  `<config key>.http_client` shape is shared with the sibling wrappers so an application meets one
-  override style. `TransportTest` registers a foreign `ClientInterface` provider both before and
-  after this one; both tests failed against the old binding. **A recorder stub is not the
-  realistic sibling**: another wrapper's adapter is a `PendingRequestClient` on the same faked
-  factory, so the fake answers whichever adapter sends and only the timeout differs.
+  shared by everything, and every Laravel API wrapper of this design used to bind it: with two
+  installed, the provider registered last supplied every package's adapter, so a package's own
+  timeouts and fixes never ran — measured on 2026-09-14 in an application with three wrappers.
+  **There is deliberately no fallback to a `ClientInterface` bound elsewhere**, because an older
+  release of another wrapper or an unrelated library may be what bound it, and taking it would
+  silently lose `Http::fake()`. The `<config key>.http_client` shape is shared with
+  `hampel/binarylane-api-laravel`, `hampel/cloudflare-api-laravel` and
+  `hampel/xenforo-api-laravel`, so an application meets one override style. `TransportTest`
+  registers a foreign `ClientInterface` provider both before and after this one; both tests failed
+  against the old binding. **A recorder stub is not the realistic neighbour**: another wrapper's
+  adapter is a `PendingRequestClient` on the same faked factory, so the fake answers whichever
+  adapter sends and only the timeout differs.
   `a_sibling_adapter_that_is_also_faked_does_not_lend_its_timeout` covers that shape, and against
-  the old binding it failed with the sibling's 3.0 in place of `linode.timeout`.
+  the old binding it failed with the other adapter's 3.0 in place of `linode.timeout`.
 
   **The key is bound with `singletonIf()`, so an application's own binding survives provider
   order.** A full Laravel application registers discovered packages before its own providers, so
@@ -71,8 +73,8 @@ clutter to be tidied away:
   API, with the token. The constructor still accepts a `Factory` instance for hand-built clients;
   that form does not follow a swap. **The swap tests point `base_uri` at `api.linode.invalid`**,
   so a regression fails to resolve rather than reaching Linode — measured that way on 2026-09-14
-  before the fix, and a closed local port is no substitute here, since under WSL mirrored
-  networking it times out rather than refusing.
+  before the fix, and a closed local port is no substitute here, since under some network setups
+  it times out rather than refusing.
 - **Options are passed to `send()` by hand, as a typed allowlist of transport options.**
   `PendingRequest` merges its options only inside its own `sendRequest()`, so sending on
   `buildClient()` directly dropped the configured timeouts and every `Http::globalOptions()`
@@ -175,8 +177,9 @@ from `git ls-files`, not `git archive`**: the archive leaves out `tests/`, `phpu
   core's suite was green on the original defect and would have stayed green if the branch had
   been narrowed the wrong way.
 - **The token variable is `LINODE_API_TOKEN`, and `LINODE_TOKEN` is read with `?:`, not as
-  `env()`'s default.** The rename brings it in line with the sibling wrappers' `*_API_TOKEN`
-  without breaking an existing `.env`. The obvious form, `env('LINODE_API_TOKEN',
+  `env()`'s default.** The rename brings it in line with the `*_API_TOKEN` names of
+  `hampel/binarylane-api-laravel` and `hampel/cloudflare-api-laravel`, without breaking an
+  existing `.env`. The obvious form, `env('LINODE_API_TOKEN',
   env('LINODE_TOKEN'))`, fails in the one situation a rename creates: a blank
   `LINODE_API_TOKEN=` line copied from an updated example while the real token still sits under
   the old name is an empty string, not null, so the default never applies and the account is
