@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Minimum Laravel versions are now 12.71 and 13.40; `illuminate/*` requires `^12.71|^13.40`.
+  Composer 2.9 and later already refuse every earlier release, as each is covered by a published
+  security advisory
 - README: an application's own `config/linode.php` overrides the package's keys and replaces
   `accounts`; a config published before 1.1.0 reads only `LINODE_TOKEN`
 

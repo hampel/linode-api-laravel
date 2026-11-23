@@ -167,10 +167,10 @@ final class TransportTest extends TestCase
         //
         // Captured as Throwable and asserted after, rather than caught as ConnectionException.
         // The call goes through the Http facade, and on the lowest toolchain this package
-        // supports (PHPStan 2.1.22, Larastan 3.4.2, Laravel 12.61.1) the facade does not carry
-        // PendingRequest::get()'s @throws, so a typed catch is reported dead and the assertion
-        // after it unreachable. It is also why fail() is not inside the try: a Throwable catch
-        // would swallow it.
+        // supports (PHPStan 2.1.22, Larastan 3.4.2; measured with Laravel 12.61.1) the facade
+        // does not carry PendingRequest::get()'s @throws, so a typed catch is reported dead and
+        // the assertion after it unreachable. It is also why fail() is not inside the try: a
+        // Throwable catch would swallow it.
         $thrown = null;
 
         try {

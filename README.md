@@ -26,7 +26,7 @@ different exceptions rather than both becoming an unsuccessful response.
 
 ## Requirements
 
-PHP 8.3 or later, and Laravel 12 or 13.
+PHP 8.3 or later, and Laravel 12.71 or later, or 13.40 or later.
 
 Laravel Zero works too, and needs the HTTP component, which an application opts into with
 `php <app> app:install http` (that command runs `composer require illuminate/http` and nothing
