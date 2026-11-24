@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## Unreleased
+
+- `guzzlehttp/guzzle` requires `^7.15.2|^8.1` and `guzzlehttp/psr7` requires `^2.13|^3.1`, the
+  lowest releases Composer 2.9 and later will install; every earlier one is covered by a published
+  security advisory, or needs one that is
+
 ## 1.3.0 (2026-11-24)
 
 - Minimum Laravel versions are now 12.71 and 13.40; `illuminate/*` requires `^12.71|^13.40`.

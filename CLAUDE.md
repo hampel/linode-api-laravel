@@ -159,6 +159,21 @@ composer update "laravel/framework:13.39.0" -W --dry-run
 from `git ls-files`, not `git archive`**: the archive leaves out `tests/`, `phpunit.xml` and
 `phpstan.neon.dist`, which are `export-ignore`d, and both tools then exit 1 on a usage error.
 
+**Guzzle and PSR-7 are floored the same way**: `guzzlehttp/guzzle` is `^7.15.2|^8.1` and
+`guzzlehttp/psr7` is `^2.13|^3.1`. Measured on 2026-11-24 with the same PHP and Composer: Guzzle
+7.15.1 and 8.0.0 and PSR-7 2.12.0 were refused for advisories, and PSR-7 3.0.0 resolves with no
+installable Guzzle, because 8.1.0 and later require `^3.1` or higher. Laravel's own `^7.8.2` on
+Guzzle no longer decides the floor; the advisories do. Two traps when re-measuring: PSR-7 2.x from
+a lock holding Guzzle 8 is refused unless `guzzlehttp/guzzle:^7.15.2` is named beside it, and
+PSR-7 3.x needs `guzzlehttp/guzzle:^8.1` named and a Laravel 13 lock, since Laravel 12 requires
+Guzzle 7.
+
+```bash
+composer update "guzzlehttp/guzzle:7.15.1" -W --dry-run
+composer update "guzzlehttp/psr7:2.12.0" "guzzlehttp/guzzle:^7.15.2" -W --dry-run
+composer update "guzzlehttp/psr7:3.0.0" "guzzlehttp/guzzle:^8.1" -W --dry-run
+```
+
 ## Facts worth not rediscovering
 
 - **Only a 204 is a success with no body, so an empty 200 raises.** `Http::fake()` with no
