@@ -1,6 +1,6 @@
 # CHANGELOG
 
-## Unreleased
+## 1.3.1 (2026-11-24)
 
 - `guzzlehttp/guzzle` requires `^7.15.2|^8.1` and `guzzlehttp/psr7` requires `^2.13|^3.1`, the
   lowest releases Composer 2.9 and later will install; every earlier one is covered by a published
